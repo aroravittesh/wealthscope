@@ -152,3 +152,45 @@ func (s *AuthService) RefreshAccessToken(userID string) (string, error) {
 	}
 	return generateAccessToken(user)
 }
+
+func GenerateNewRefreshToken() (string, error) {
+	bytes := make([]byte, 32)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
+func (s *AuthService) ChangePassword(
+	userID string,
+	oldPassword string,
+	newPassword string,
+) error {
+
+	user, err := s.UserRepo.FindByID(userID)
+	if err != nil {
+		return errors.New("user not found")
+	}
+
+	// Verify old password
+	if err := checkPassword(oldPassword, user.PasswordHash); err != nil {
+		return errors.New("invalid old password")
+	}
+
+	// Hash new password
+	newHash, err := hashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+
+	// Update password
+	if err := s.UserRepo.UpdatePassword(userID, newHash); err != nil {
+		return err
+	}
+
+	// Invalidate all refresh tokens (force re-login everywhere)
+	_ = s.RefreshTokenRepo.DeleteByUser(userID)
+
+	return nil
+}

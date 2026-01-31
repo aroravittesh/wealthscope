@@ -10,6 +10,7 @@ import (
 
 	"wealthscope-backend/internal/db"
 	"wealthscope-backend/internal/handlers"
+	"wealthscope-backend/internal/middleware"
 	"wealthscope-backend/internal/repository"
 	"wealthscope-backend/internal/services"
 )
@@ -46,6 +47,16 @@ func main() {
 	router.HandleFunc("/auth/register", authHandler.Register).Methods("POST")
 	router.HandleFunc("/auth/login", authHandler.Login).Methods("POST")
 	router.HandleFunc("/auth/refresh", handlers.Refresh(authService)).Methods("POST")
+	router.HandleFunc("/auth/logout", handlers.Logout(authService)).Methods("POST")
+
+	router.Handle(
+		"/auth/change-password",
+		middleware.AuthMiddleware(
+			handlers.ChangePassword(authService),
+		),
+	).Methods("POST")
+	
+
 
 	log.Println("WealthScope server running on port", port)
 	log.Fatal(http.ListenAndServe(":"+port, router))

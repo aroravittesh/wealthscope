@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"wealthscope-backend/internal/services"
+	"wealthscope-backend/internal/repository"
 )
 
 type refreshRequest struct {
@@ -13,8 +14,10 @@ type refreshRequest struct {
 }
 
 type refreshResponse struct {
-	AccessToken string `json:"access_token"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }
+
 
 func Refresh(auth *services.AuthService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -25,25 +28,47 @@ func Refresh(auth *services.AuthService) http.HandlerFunc {
 			return
 		}
 
-		// Find refresh token in DB
-		tokenData, err := auth.RefreshTokenRepo.Find(req.RefreshToken)
-		if err != nil || tokenData.ExpiresAt.Before(time.Now().UTC()) {
+		// Find existing refresh token
+		oldToken, err := auth.RefreshTokenRepo.Find(req.RefreshToken)
+		if err != nil || oldToken.ExpiresAt.Before(time.Now().UTC()) {
 			http.Error(w, "invalid or expired refresh token", http.StatusUnauthorized)
 			return
 		}
 
-		// Update last-used timestamp (inactivity tracking)
-		auth.RefreshTokenRepo.UpdateLastUsed(req.RefreshToken, time.Now().UTC())
+		// Rotate: delete old token
+		_ = auth.RefreshTokenRepo.Delete(req.RefreshToken)
 
-		// Generate new access token via service
-		accessToken, err := auth.RefreshAccessToken(tokenData.UserID)
+		// Generate new refresh token
+		newRefreshToken, err := services.GenerateNewRefreshToken()
+		if err != nil {
+			http.Error(w, "token error", http.StatusInternalServerError)
+			return
+		}
+
+		now := time.Now().UTC()
+
+		newToken := &repository.RefreshToken{
+			UserID:     oldToken.UserID,
+			Token:      newRefreshToken,
+			LastUsedAt: now,
+			ExpiresAt:  now.Add(1 * time.Hour),
+		}
+
+		if err := auth.RefreshTokenRepo.Create(newToken); err != nil {
+			http.Error(w, "token error", http.StatusInternalServerError)
+			return
+		}
+
+		// Generate new access token
+		accessToken, err := auth.RefreshAccessToken(oldToken.UserID)
 		if err != nil {
 			http.Error(w, "token error", http.StatusInternalServerError)
 			return
 		}
 
 		json.NewEncoder(w).Encode(refreshResponse{
-			AccessToken: accessToken,
+			AccessToken:  accessToken,
+			RefreshToken: newRefreshToken,
 		})
 	}
 }
