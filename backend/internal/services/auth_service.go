@@ -1,20 +1,27 @@
 package services
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"os"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
 	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 
 	"wealthscope-backend/internal/models"
 	"wealthscope-backend/internal/repository"
 )
 
 type AuthService struct {
-	UserRepo repository.UserRepository
+	UserRepo         repository.UserRepository
+	RefreshTokenRepo repository.RefreshTokenRepository
 }
+
+/* ======================
+   PASSWORD HELPERS
+====================== */
 
 func hashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 12)
@@ -24,6 +31,10 @@ func hashPassword(password string) (string, error) {
 func checkPassword(password, hash string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }
+
+/* ======================
+   JWT ACCESS TOKEN
+====================== */
 
 type Claims struct {
 	UserID string `json:"user_id"`
@@ -44,6 +55,23 @@ func generateAccessToken(user *models.User) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 }
+
+/* ======================
+   REFRESH TOKEN
+====================== */
+
+func generateRefreshToken() (string, error) {
+	bytes := make([]byte, 32)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
+/* ======================
+   AUTH BUSINESS LOGIC
+====================== */
 
 func (s *AuthService) Register(
 	email string,
@@ -74,20 +102,53 @@ func (s *AuthService) Register(
 func (s *AuthService) Login(
 	email string,
 	password string,
-) (string, error) {
+) (string, string, error) {
 
 	user, err := s.UserRepo.FindByEmail(email)
 	if err != nil {
-		return "", errors.New("invalid credentials")
+		return "", "", errors.New("invalid credentials")
 	}
 
 	if err := checkPassword(password, user.PasswordHash); err != nil {
-		return "", errors.New("invalid credentials")
+		return "", "", errors.New("invalid credentials")
 	}
 
 	if !user.IsEmailVerified {
-		return "", errors.New("email not verified")
+		return "", "", errors.New("email not verified")
 	}
 
+	// Generate refresh token
+	refreshToken, err := generateRefreshToken()
+	if err != nil {
+		return "", "", err
+	}
+
+	now := time.Now().UTC()
+
+	rt := &repository.RefreshToken{
+		UserID:     user.ID,
+		Token:      refreshToken,
+		LastUsedAt: now,
+		ExpiresAt:  now.Add(1 * time.Hour),
+	}
+
+	if err := s.RefreshTokenRepo.Create(rt); err != nil {
+		return "", "", err
+	}
+
+	// Generate access token
+	accessToken, err := generateAccessToken(user)
+	if err != nil {
+		return "", "", err
+	}
+
+	return accessToken, refreshToken, nil
+}
+
+func (s *AuthService) RefreshAccessToken(userID string) (string, error) {
+	user, err := s.UserRepo.FindByID(userID)
+	if err != nil {
+		return "", err
+	}
 	return generateAccessToken(user)
 }

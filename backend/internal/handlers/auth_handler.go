@@ -52,13 +52,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.AuthService.Login(req.Email, req.Password)
+	accessToken, refreshToken, err := h.AuthService.Login(req.Email, req.Password)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 
 	json.NewEncoder(w).Encode(map[string]string{
-		"access_token": token,
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
 	})
 }

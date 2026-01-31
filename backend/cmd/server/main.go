@@ -24,10 +24,12 @@ func main() {
 
 	// repositories
 	userRepo := repository.NewUserRepository(database)
+	refreshTokenRepo := repository.NewRefreshTokenRepository(database)
 
-	// services
+	// services (DEPENDENCIES WIRED CORRECTLY)
 	authService := &services.AuthService{
-		UserRepo: userRepo,
+		UserRepo:         userRepo,
+		RefreshTokenRepo: refreshTokenRepo,
 	}
 
 	// handlers
@@ -35,12 +37,15 @@ func main() {
 
 	router := mux.NewRouter()
 
+	// health check
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("WealthScope backend connected to Supabase"))
 	}).Methods("GET")
 
+	// auth routes
 	router.HandleFunc("/auth/register", authHandler.Register).Methods("POST")
 	router.HandleFunc("/auth/login", authHandler.Login).Methods("POST")
+	router.HandleFunc("/auth/refresh", handlers.Refresh(authService)).Methods("POST")
 
 	log.Println("WealthScope server running on port", port)
 	log.Fatal(http.ListenAndServe(":"+port, router))
