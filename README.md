@@ -1,3 +1,13 @@
+Project Name - Wealthscope
+
+Team Members:
+Vittesh Arora - Backend
+Ansh Jain - Backend
+Raghav Gupta - Frontend
+Rishithaa Maligireddy - Frontend
+
+
+
 🔹 Project Description 
 The Stock Portfolio Intelligence Platform is a full‑stack web application developed to demonstrate core software engineering principles, including system design, modular architecture, database management, machine learning integration, and cloud deployment.
 
