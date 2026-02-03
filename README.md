@@ -2,10 +2,15 @@ Wealthscope – Stock Portfolio Intelligence Platform
 --------------------------------------------------
 
 Team Members:
-Vittesh Arora - Backend
-Ansh Jain - Backend
-Raghav Gupta - Frontend
-Rishithaa Maligireddy - Frontend
+
+1) Vittesh Arora - Backend
+
+2) Ansh Jain - Backend
+
+3) Raghav Gupta - Frontend
+
+4) Rishithaa Maligireddy - Frontend
+
 
 --------------------------------------------------
 
@@ -65,8 +70,6 @@ The system follows a layered, service-oriented architecture consisting of:
 - Application Layer: Go backend exposing RESTful APIs
 - Data Layer: SQL database for persistent storage
 - Analytics Layer: Python ML microservice for portfolio insights
-
-This architecture ensures loose coupling, scalability, and ease of testing.
 
 --------------------------------------------------
 
