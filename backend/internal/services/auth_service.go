@@ -6,7 +6,11 @@ import (
 	"errors"
 	"os"
 	"time"
-
+	// "io"
+	// "net/http"
+	// "encoding/json"
+	// "strings"
+	// "bytes"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
@@ -99,6 +103,8 @@ func (s *AuthService) Register(
 	return s.UserRepo.Create(user)
 }
 
+
+
 func (s *AuthService) Login(
 	email string,
 	password string,
@@ -113,9 +119,9 @@ func (s *AuthService) Login(
 		return "", "", errors.New("invalid credentials")
 	}
 
-	if !user.IsEmailVerified {
-		return "", "", errors.New("email not verified")
-	}
+	// if !user.IsEmailVerified {
+	// 	return "", "", errors.New("email not verified")
+	// }
 
 	// Generate refresh token
 	refreshToken, err := generateRefreshToken()

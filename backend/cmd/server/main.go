@@ -25,6 +25,12 @@ func main() {
 
 	// repositories
 	userRepo := repository.NewUserRepository(database)
+	portfolioRepo := repository.NewPortfolioRepository(database)
+    portfolioService := &services.PortfolioService{
+	PortfolioRepo: portfolioRepo,
+    }
+    portfolioHandler := handlers.NewPortfolioHandler(portfolioService)
+
 	refreshTokenRepo := repository.NewRefreshTokenRepository(database)
 
 	// services (DEPENDENCIES WIRED CORRECTLY)
@@ -55,6 +61,28 @@ func main() {
 			handlers.ChangePassword(authService),
 		),
 	).Methods("POST")
+
+	router.Handle(
+		"/portfolios",
+		middleware.AuthMiddleware(http.HandlerFunc(portfolioHandler.Create)),
+	).Methods("POST")
+	
+	router.Handle(
+		"/portfolios",
+		middleware.AuthMiddleware(http.HandlerFunc(portfolioHandler.GetUserPortfolios)),
+	).Methods("GET")
+	
+	router.Handle(
+		"/portfolios/{id}",
+		middleware.AuthMiddleware(http.HandlerFunc(portfolioHandler.Rename)),
+	).Methods("PUT")
+	
+	router.Handle(
+		"/portfolios/{id}",
+		middleware.AuthMiddleware(http.HandlerFunc(portfolioHandler.Delete)),
+	).Methods("DELETE")
+	
+	
 	
 
 
