@@ -151,22 +151,54 @@ func (s *AuthService) Login(
 	return accessToken, refreshToken, nil
 }
 
-func (s *AuthService) RefreshAccessToken(userID string) (string, error) {
-	user, err := s.UserRepo.FindByID(userID)
+func (s *AuthService) RefreshAccessToken(oldToken string) (string, string, error) {
+
+	tokenData, err := s.RefreshTokenRepo.Find(oldToken)
 	if err != nil {
-		return "", err
+		return "", "", errors.New("invalid refresh token")
 	}
-	return generateAccessToken(user)
+
+	if tokenData.ExpiresAt.Before(time.Now().UTC()) {
+		return "", "", errors.New("refresh token expired")
+	}
+
+	user, err := s.UserRepo.FindByID(tokenData.UserID)
+	if err != nil {
+		return "", "", errors.New("user not found")
+	}
+
+	// 🔥 Delete old refresh token (rotation)
+	if err := s.RefreshTokenRepo.Delete(oldToken); err != nil {
+		return "", "", err
+	}
+
+	// 🔥 Generate new refresh token
+	newRefreshToken, err := generateRefreshToken()
+	if err != nil {
+		return "", "", err
+	}
+
+	now := time.Now().UTC()
+
+	rt := &repository.RefreshToken{
+		UserID:     user.ID,
+		Token:      newRefreshToken,
+		LastUsedAt: now,
+		ExpiresAt:  now.Add(1 * time.Hour),
+	}
+
+	if err := s.RefreshTokenRepo.Create(rt); err != nil {
+		return "", "", err
+	}
+
+	accessToken, err := generateAccessToken(user)
+	if err != nil {
+		return "", "", err
+	}
+
+	return accessToken, newRefreshToken, nil
 }
 
-func GenerateNewRefreshToken() (string, error) {
-	bytes := make([]byte, 32)
-	_, err := rand.Read(bytes)
-	if err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(bytes), nil
-}
 
 func (s *AuthService) ChangePassword(
 	userID string,
