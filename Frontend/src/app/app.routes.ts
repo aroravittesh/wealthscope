@@ -1,10 +1,10 @@
 import { Routes } from '@angular/router';
 import { AuthGuard } from './guards/auth.guard';
-import { LoginComponent } from './features/auth/login/login.component';
-import { RegisterComponent } from './features/auth/register/register.component';
+import { LoginComponent } from './features/pages/login/login';
+import { SignupComponent } from './features/pages/signup/signup';
+import { PaymentComponent } from './features/payment/payment.component';
 import { DashboardOverviewComponent } from './features/dashboard/overview/overview.component';
 import { LandingComponent } from './features/landing/landing.component';
-import { PaymentComponent } from './features/payment/payment.component';
 import { FeaturesComponent } from './features/pages/features.component';
 import { PricingComponent } from './features/pages/pricing.component';
 import { SecurityComponent } from './features/pages/security.component';
@@ -49,7 +49,7 @@ export const routes: Routes = [
     path: 'auth',
     children: [
       { path: 'login', component: LoginComponent },
-      { path: 'register', component: RegisterComponent }
+      { path: 'signup', component: SignupComponent }
     ]
   },
   {
