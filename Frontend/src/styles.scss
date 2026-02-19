@@ -1,0 +1,156 @@
+/* --- 3D/Modern Hover Effects for All Dropdowns, Buttons, and Cards --- */
+
+select, .custom-select {
+  background: linear-gradient(135deg, #232946 60%, #3b3b5b 100%);
+  border: none;
+  border-radius: 1rem;
+  color: #fff;
+  box-shadow: 0 2px 12px 0 rgba(44, 62, 80, 0.12);
+  transition: box-shadow 0.2s, transform 0.2s, border 0.2s;
+  padding: 0.75rem 2.5rem 0.75rem 1rem;
+  font-weight: 500;
+  appearance: none;
+  outline: none;
+}
+select:hover, .custom-select:hover, select:focus, .custom-select:focus {
+  box-shadow: 0 6px 24px 0 rgba(80, 120, 255, 0.25), 0 1.5px 8px 0 rgba(44, 62, 80, 0.10);
+  border: 2px solid #7f9cf5;
+  transform: scale(1.04) rotateX(3deg);
+  background: linear-gradient(135deg, #232946 40%, #7f9cf5 100%);
+}
+
+button, .btn {
+  background: linear-gradient(90deg, #4f46e5 0%, #9333ea 100%);
+  color: #fff;
+  border: none;
+  border-radius: 1rem;
+  font-weight: 600;
+  box-shadow: 0 2px 12px 0 rgba(44, 62, 80, 0.10);
+  transition: box-shadow 0.2s, transform 0.2s, background 0.2s;
+  padding: 0.75rem 2rem;
+  cursor: pointer;
+}
+button:hover, .btn:hover, button:focus, .btn:focus {
+  background: linear-gradient(90deg, #6366f1 0%, #a21caf 100%);
+  box-shadow: 0 8px 32px 0 rgba(80, 120, 255, 0.18), 0 2px 8px 0 rgba(44, 62, 80, 0.10);
+  transform: scale(1.06) translateY(-2px) rotateX(4deg);
+}
+
+.card, .premium-card, .card-shadow {
+  background: linear-gradient(135deg, rgba(36, 37, 42, 0.95) 60%, rgba(60, 60, 80, 0.85) 100%);
+  border-radius: 1.5rem;
+  box-shadow: 0 4px 32px 0 rgba(80, 120, 255, 0.10), 0 1.5px 8px 0 rgba(44, 62, 80, 0.10);
+  border: 1.5px solid rgba(127, 156, 245, 0.12);
+  transition: box-shadow 0.2s, border 0.2s, transform 0.2s;
+}
+.card:hover, .premium-card:hover, .card-shadow:hover {
+  box-shadow: 0 12px 48px 0 rgba(127, 156, 245, 0.18), 0 2px 12px 0 rgba(44, 62, 80, 0.12);
+  border: 2.5px solid #7f9cf5;
+  transform: scale(1.03) rotateY(3deg) rotateX(2deg);
+}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  font-family: 'Inter', sans-serif;
+}
+
+body {
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+  color: #F1F5F9;
+  line-height: 1.6;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.6);
+  border-radius: 10px;
+
+  &:hover {
+    background: rgba(59, 130, 246, 0.8);
+  }
+}
+
+/* Animations */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.3s ease-out;
+}
+
+/* Utility Classes */
+.gradient-text {
+  background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.glass-effect {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.card-shadow {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 10px 13px rgba(0, 0, 0, 0.1);
+}
+
+.transition-smooth {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}

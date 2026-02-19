@@ -1,0 +1,324 @@
+<div class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 py-12 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-12">
+      <div>
+        <h1 class="text-4xl font-bold text-white mb-2">Complete Your Purchase</h1>
+        <p class="text-slate-400">Choose your preferred payment method</p>
+      </div>
+      <button 
+        (click)="goBack()"
+        class="text-slate-400 hover:text-white transition text-2xl"
+      >
+        ✕
+      </button>
+    </div>
+
+    <div class="grid lg:grid-cols-3 gap-8">
+      <!-- Left: Payment Methods -->
+      <div class="lg:col-span-2">
+        <!-- Plan Details Card -->
+        <div class="bg-gradient-to-br from-blue-900 to-purple-900 rounded-2xl p-8 border border-blue-500 mb-8 backdrop-blur-lg">
+          <div class="flex justify-between items-start mb-6">
+            <div>
+              <h2 class="text-3xl font-bold text-white mb-2">{{ planDetails[selectedPlan].name }} Plan</h2>
+              <p class="text-blue-200">{{ planDetails[selectedPlan].duration }}</p>
+            </div>
+            <div class="text-right">
+              <div class="text-4xl font-bold text-white mb-2">
+                <span *ngIf="planDetails[selectedPlan].price !== 'Custom'">
+                  ${{ planDetails[selectedPlan].price }}
+                </span>
+                <span *ngIf="planDetails[selectedPlan].price === 'Custom'">Custom</span>
+              </div>
+              <p *ngIf="planDetails[selectedPlan].period" class="text-blue-200">/{{ planDetails[selectedPlan].period }}</p>
+            </div>
+          </div>
+          <p *ngIf="selectedPlan === 'free'" class="text-blue-100">No payment required. Create your account to get started!</p>
+          <p *ngIf="selectedPlan === 'pro'" class="text-blue-100">Unlock unlimited portfolios, advanced analytics, and AI insights</p>
+          <p *ngIf="selectedPlan === 'enterprise'" class="text-blue-100">Custom pricing for enterprise needs with dedicated support</p>
+        </div>
+
+        <!-- Free Plan Message -->
+        <div *ngIf="selectedPlan === 'free'" class="bg-green-900 bg-opacity-30 border border-green-500 rounded-xl p-8 backdrop-blur-lg">
+          <div class="flex items-start gap-4">
+            <div class="text-4xl">✓</div>
+            <div>
+              <h3 class="text-xl font-bold text-green-400 mb-2">No Payment Required</h3>
+              <p class="text-green-200 mb-6">You're all set to start using FinSight Free! Click below to proceed to your dashboard.</p>
+              <button 
+                (click)="processPayment()"
+                class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition duration-300 transform hover:scale-105"
+              >
+                Start Using FinSight Free
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Payment Methods -->
+        <div *ngIf="selectedPlan !== 'free'" class="space-y-4">
+          <h3 class="text-2xl font-bold text-white mb-6">Select Payment Method</h3>
+
+          <div class="grid grid-cols-1 gap-4">
+            <div *ngFor="let method of paymentMethods" 
+              (click)="selectPaymentMethod(method.id)"
+              [ngClass]="{'ring-2 ring-blue-400 bg-slate-800 bg-opacity-80': selectedPaymentMethod === method.id}"
+              class="bg-slate-800 bg-opacity-40 border border-slate-700 rounded-xl p-6 cursor-pointer transition-all duration-300 hover:bg-opacity-60 hover:border-blue-500"
+            >
+              <div class="flex items-center gap-4">
+                <div class="text-4xl">{{ method.icon }}</div>
+                <div class="flex-1">
+                  <h4 class="text-xl font-bold text-white">{{ method.name }}</h4>
+                  <p class="text-slate-400">{{ method.description }}</p>
+                </div>
+                <div [ngClass]="{'bg-blue-500': selectedPaymentMethod === method.id, 'border-slate-600': selectedPaymentMethod !== method.id}" 
+                  class="w-6 h-6 border-2 rounded-full flex items-center justify-center">
+                  <span *ngIf="selectedPaymentMethod === method.id" class="text-white">✓</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Payment Form -->
+        <form [formGroup]="paymentForm" *ngIf="selectedPlan !== 'free'" class="mt-8">
+          <!-- Common Fields -->
+          <div class="bg-slate-800 bg-opacity-40 border border-slate-700 rounded-xl p-8 backdrop-blur-lg mb-6">
+            <h4 class="text-lg font-bold text-white mb-6">Billing Information</h4>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label class="block text-slate-300 font-semibold mb-2">Full Name</label>
+                <input 
+                  type="text" 
+                  formControlName="fullName"
+                  placeholder="John Doe"
+                  class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 outline-none transition"
+                />
+                <p *ngIf="paymentForm.get('fullName')?.invalid && paymentForm.get('fullName')?.touched" 
+                  class="text-red-400 text-sm mt-1">
+                  {{ getFieldError('fullName') }}
+                </p>
+              </div>
+              <div>
+                <label class="block text-slate-300 font-semibold mb-2">Email Address</label>
+                <input 
+                  type="email" 
+                  formControlName="email"
+                  placeholder="john@example.com"
+                  class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 outline-none transition"
+                />
+                <p *ngIf="paymentForm.get('email')?.invalid && paymentForm.get('email')?.touched" 
+                  class="text-red-400 text-sm mt-1">
+                  {{ getFieldError('email') }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Credit/Debit Card -->
+          <div *ngIf="selectedPaymentMethod === 'card'" class="bg-slate-800 bg-opacity-40 border border-slate-700 rounded-xl p-8 backdrop-blur-lg mb-6">
+            <h4 class="text-lg font-bold text-white mb-6">Card Details</h4>
+            
+            <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 mb-6 text-white border border-blue-500">
+              <div class="flex justify-between mb-8">
+                <div>
+                  <p class="text-sm text-blue-100 mb-1">Card Number</p>
+                  <p class="text-2xl font-bold tracking-widest">{{ paymentForm.get('cardNumber')?.value || '•••• •••• •••• ••••' }}</p>
+                </div>
+                <div class="text-3xl">💳</div>
+              </div>
+              <div class="flex justify-between">
+                <div>
+                  <p class="text-xs text-blue-100">Card Holder</p>
+                  <p class="font-semibold">{{ paymentForm.get('fullName')?.value || 'YOUR NAME' }}</p>
+                </div>
+                <div>
+                  <p class="text-xs text-blue-100">Expires</p>
+                  <p class="font-semibold">{{ paymentForm.get('cardExpiry')?.value || 'MM/YY' }}</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label class="block text-slate-300 font-semibold mb-2">Card Number (16 digits)</label>
+                <input 
+                  type="text" 
+                  formControlName="cardNumber"
+                  placeholder="1234567890123456"
+                  maxlength="16"
+                  class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 outline-none transition"
+                />
+                <p *ngIf="paymentForm.get('cardNumber')?.invalid && paymentForm.get('cardNumber')?.touched" 
+                  class="text-red-400 text-sm mt-1">
+                  {{ getFieldError('cardNumber') }}
+                </p>
+              </div>
+              <div>
+                <label class="block text-slate-300 font-semibold mb-2">Expiry Date (MM/YY)</label>
+                <input 
+                  type="text" 
+                  formControlName="cardExpiry"
+                  placeholder="12/25"
+                  maxlength="5"
+                  class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 outline-none transition"
+                />
+                <p *ngIf="paymentForm.get('cardExpiry')?.invalid && paymentForm.get('cardExpiry')?.touched" 
+                  class="text-red-400 text-sm mt-1">
+                  {{ getFieldError('cardExpiry') }}
+                </p>
+              </div>
+              <div>
+                <label class="block text-slate-300 font-semibold mb-2">CVV (3 digits)</label>
+                <input 
+                  type="text" 
+                  formControlName="cardCvv"
+                  placeholder="123"
+                  maxlength="3"
+                  class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 outline-none transition"
+                />
+                <p *ngIf="paymentForm.get('cardCvv')?.invalid && paymentForm.get('cardCvv')?.touched" 
+                  class="text-red-400 text-sm mt-1">
+                  {{ getFieldError('cardCvv') }}
+                </p>
+              </div>
+            </div>
+
+            <div class="bg-blue-900 bg-opacity-30 border border-blue-500 rounded-lg p-4 mt-6">
+              <p class="text-blue-200 text-sm">🔒 Your payment information is encrypted and secure.</p>
+            </div>
+          </div>
+
+          <!-- ACH Bank Transfer -->
+          <div *ngIf="selectedPaymentMethod === 'ach'" class="bg-slate-800 bg-opacity-40 border border-slate-700 rounded-xl p-8 backdrop-blur-lg mb-6">
+            <h4 class="text-lg font-bold text-white mb-6">ACH Bank Transfer Details</h4>
+            <div class="mb-6">
+              <label class="block text-slate-300 font-semibold mb-2">Bank Name</label>
+              <input 
+                type="text" 
+                formControlName="achBankName"
+                placeholder="Bank of America"
+                class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 outline-none transition"
+              />
+              <p *ngIf="paymentForm.get('achBankName')?.invalid && paymentForm.get('achBankName')?.touched" 
+                class="text-red-400 text-sm mt-1">
+                {{ getFieldError('achBankName') }}
+              </p>
+            </div>
+            <div class="mb-6">
+              <label class="block text-slate-300 font-semibold mb-2">Account Number</label>
+              <input 
+                type="text" 
+                formControlName="achAccountNumber"
+                placeholder="1234567890"
+                class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 outline-none transition"
+              />
+              <p *ngIf="paymentForm.get('achAccountNumber')?.invalid && paymentForm.get('achAccountNumber')?.touched" 
+                class="text-red-400 text-sm mt-1">
+                {{ getFieldError('achAccountNumber') }}
+              </p>
+            </div>
+
+            <div class="bg-yellow-900 bg-opacity-30 border border-yellow-500 rounded-lg p-4">
+              <p class="text-yellow-200 text-sm">💡 ACH transfers typically process within 1-3 business days.</p>
+            </div>
+          </div>
+
+          <!-- PayPal -->
+          <div *ngIf="selectedPaymentMethod === 'paypal'" class="bg-slate-800 bg-opacity-40 border border-slate-700 rounded-xl p-8 backdrop-blur-lg mb-6">
+            <h4 class="text-lg font-bold text-white mb-6">PayPal Details</h4>
+            <div class="mb-6">
+              <label class="block text-slate-300 font-semibold mb-2">PayPal Email</label>
+              <input 
+                type="email" 
+                formControlName="paypalEmail"
+                placeholder="your@email.com"
+                class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 outline-none transition"
+              />
+              <p *ngIf="paymentForm.get('paypalEmail')?.invalid && paymentForm.get('paypalEmail')?.touched" 
+                class="text-red-400 text-sm mt-1">
+                {{ getFieldError('paypalEmail') }}
+              </p>
+            </div>
+
+            <div class="bg-yellow-900 bg-opacity-30 border border-yellow-500 rounded-lg p-4">
+              <p class="text-yellow-200 text-sm">💡 You'll be securely redirected to PayPal to complete your payment.</p>
+            </div>
+          </div>
+
+          <!-- Payment Button -->
+          <button 
+            (click)="processPayment()"
+            [disabled]="!paymentForm.valid"
+            [ngClass]="{'opacity-50 cursor-not-allowed': !paymentForm.valid}"
+            class="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 rounded-lg transition duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-blue-500/50 disabled:hover:scale-100 disabled:shadow-none text-lg glow-btn"
+          >
+            {{ !paymentForm.valid ? '⚠️ Complete Form' : '✓ Pay Now' }}
+          </button>
+        </form>
+      </div>
+
+      <!-- Right: Order Summary -->
+      <div class="lg:col-span-1">
+        <div class="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 rounded-2xl p-8 backdrop-blur-lg sticky top-8">
+          <h3 class="text-2xl font-bold text-white mb-6">Order Summary</h3>
+          
+          <!-- Plan Details -->
+          <div class="mb-6 pb-6 border-b border-slate-700">
+            <p class="text-slate-400 text-sm mb-2">Plan</p>
+            <p class="text-2xl font-bold text-white">{{ planDetails[selectedPlan].name }}</p>
+            <p class="text-slate-400 text-xs mt-1">{{ planDetails[selectedPlan].duration }}</p>
+          </div>
+
+          <!-- Price -->
+          <div class="mb-6 pb-6 border-b border-slate-700">
+            <p class="text-slate-400 text-sm mb-2">Amount</p>
+            <div class="flex justify-between items-end">
+              <span class="text-3xl font-bold text-white">
+                <span *ngIf="planDetails[selectedPlan].price !== 'Custom'">
+                  ${{ planDetails[selectedPlan].price }}
+                </span>
+                <span *ngIf="planDetails[selectedPlan].price === 'Custom'">Custom</span>
+              </span>
+              <span *ngIf="planDetails[selectedPlan].period" class="text-slate-400">/{{ planDetails[selectedPlan].period }}</span>
+            </div>
+          </div>
+
+          <!-- Payment Method -->
+          <div *ngIf="selectedPlan !== 'free'" class="mb-6 pb-6 border-b border-slate-700">
+            <p class="text-slate-400 text-sm mb-2">Payment Method</p>
+            <p class="text-white font-semibold">{{ getPaymentMethodName(selectedPaymentMethod) }}</p>
+          </div>
+
+          <!-- Total -->
+          <div class="mb-8">
+            <div class="flex justify-between items-center">
+              <p class="text-white font-semibold">Total</p>
+              <p class="text-2xl font-bold text-blue-400">
+                <span *ngIf="planDetails[selectedPlan].price !== 'Custom'">
+                  ${{ planDetails[selectedPlan].price }}
+                </span>
+                <span *ngIf="planDetails[selectedPlan].price === 'Custom'">Custom</span>
+              </p>
+            </div>
+          </div>
+
+          <!-- Trust Badges -->
+          <div class="space-y-3">
+            <!-- Security -->
+            <div class="bg-green-900 bg-opacity-30 border border-green-500 rounded-lg p-4">
+              <p class="text-green-200 text-sm">🔒 Your payment is 100% secure and encrypted with industry-standard SSL technology.</p>
+            </div>
+
+            <!-- Money Back Guarantee -->
+            <div class="bg-blue-900 bg-opacity-30 border border-blue-500 rounded-lg p-4">
+              <p class="text-blue-200 text-sm">✓ 30-day money-back guarantee if you're not satisfied.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
