@@ -1,21 +1,20 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
-import { tap, map, delay, catchError } from 'rxjs/operators';
+import { tap, delay } from 'rxjs/operators';
 import { User, AuthResponse } from '../models';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = 'http://localhost:8080/api';
+
   private currentUserSubject = new BehaviorSubject<User | null>(this.getUserFromStorage());
   public currentUser$ = this.currentUserSubject.asObservable();
-  
+
   private isAuthenticatedSubject = new BehaviorSubject<boolean>(this.hasToken());
   public isAuthenticated$ = this.isAuthenticatedSubject.asObservable();
 
-  // Mock users database for development
+  // Mock users database
   private mockUsers: Map<string, { password: string; user: User }> = new Map([
     ['test@example.com', {
       password: 'password123',
@@ -41,21 +40,23 @@ export class AuthService {
     }]
   ]);
 
-  constructor(private http: HttpClient) {
+  constructor() {
     this.checkTokenExpiry();
   }
 
+  // ========================
+  // REGISTER (Mock Only)
+  // ========================
   register(email: string, password: string, fullName: string): Observable<AuthResponse> {
-    // Mock registration - check if user already exists
+
     if (this.mockUsers.has(email)) {
       return throwError(() => ({
-        error: { message: 'Email already registered. Please login or use a different email.' }
+        error: { message: 'Email already registered' }
       })).pipe(delay(800));
     }
 
-    // Create new mock user
     const newUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 9),
       email,
       fullName,
       role: 'USER',
@@ -63,13 +64,11 @@ export class AuthService {
       updatedAt: new Date()
     };
 
-    // Store in mock database
     this.mockUsers.set(email, {
       password,
       user: newUser
     });
 
-    // Return mock auth response
     const mockResponse: AuthResponse = {
       token: this.generateMockToken(newUser),
       refreshToken: this.generateMockToken(newUser),
@@ -82,37 +81,34 @@ export class AuthService {
     );
   }
 
+  // ========================
+  // LOGIN (Mock Only)
+  // ========================
   login(email: string, password: string): Observable<AuthResponse> {
-    // First try mock login
-    const mockUser = this.mockUsers.get(email);
-    if (mockUser && mockUser.password === password) {
-      const mockResponse: AuthResponse = {
-        token: this.generateMockToken(mockUser.user),
-        refreshToken: this.generateMockToken(mockUser.user),
-        user: mockUser.user
-      };
 
-      return of(mockResponse).pipe(
-        delay(800),
-        tap(response => this.handleAuthResponse(response))
-      );
+    const mockUser = this.mockUsers.get(email);
+
+    if (!mockUser || mockUser.password !== password) {
+      return throwError(() => ({
+        error: { message: 'Invalid email or password' }
+      })).pipe(delay(800));
     }
 
-    // Try real API if mock fails
-    return this.http.post<AuthResponse>(`${this.apiUrl}/auth/login`, {
-      email,
-      password
-    }).pipe(
-      tap(response => this.handleAuthResponse(response)),
-      catchError(() => {
-        // If API fails, provide helpful error
-        return throwError(() => ({
-          error: { message: 'Invalid email or password. Try: test@example.com / password123' }
-        }));
-      })
+    const mockResponse: AuthResponse = {
+      token: this.generateMockToken(mockUser.user),
+      refreshToken: this.generateMockToken(mockUser.user),
+      user: mockUser.user
+    };
+
+    return of(mockResponse).pipe(
+      delay(800),
+      tap(response => this.handleAuthResponse(response))
     );
   }
 
+  // ========================
+  // LOGOUT
+  // ========================
   logout(): void {
     localStorage.removeItem('authToken');
     localStorage.removeItem('refreshToken');
@@ -121,20 +117,9 @@ export class AuthService {
     this.isAuthenticatedSubject.next(false);
   }
 
-  refreshToken(): Observable<AuthResponse> {
-    const refreshToken = localStorage.getItem('refreshToken');
-    if (!refreshToken) {
-      return throwError(() => ({ error: { message: 'No refresh token available' } }));
-    }
-
-    return this.http.post<AuthResponse>(`${this.apiUrl}/auth/refresh`, {
-      refreshToken
-    }).pipe(
-      tap(response => this.handleAuthResponse(response)),
-      catchError(() => throwError(() => ({ error: { message: 'Token refresh failed' } })))
-    );
-  }
-
+  // ========================
+  // HELPERS
+  // ========================
   getCurrentUser(): User | null {
     return this.currentUserSubject.value;
   }
@@ -161,7 +146,6 @@ export class AuthService {
   }
 
   private checkTokenExpiry(): void {
-    // Check token every minute
     setInterval(() => {
       if (this.hasToken() && this.isTokenExpired()) {
         this.logout();
@@ -172,7 +156,7 @@ export class AuthService {
   private isTokenExpired(): boolean {
     const token = localStorage.getItem('authToken');
     if (!token) return true;
-    
+
     try {
       const decoded = JSON.parse(atob(token.split('.')[1]));
       return decoded.exp * 1000 < Date.now();
@@ -188,7 +172,7 @@ export class AuthService {
       email: user.email,
       name: user.fullName,
       iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 24 hours
+      exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60)
     }));
     const signature = btoa('mock-signature');
     return `${header}.${payload}.${signature}`;
