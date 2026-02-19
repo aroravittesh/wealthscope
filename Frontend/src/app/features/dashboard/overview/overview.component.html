@@ -1,0 +1,107 @@
+<div class="space-y-6">
+  <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-bold text-white">Dashboard</h1>
+      <p class="text-slate-400 mt-1">Welcome back, {{ currentUser?.fullName || 'User' }}</p>
+    </div>
+    <button class="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold px-6 py-3 rounded-lg transition glow-button transform hover:scale-105 hover:shadow-lg hover:shadow-blue-500/50">
+      ✨ New Portfolio
+    </button>
+  </div>
+
+  <!-- Metrics Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <ng-container *ngIf="metrics; else skeletonMetrics">
+      <div class="bg-slate-800 bg-opacity-50 backdrop-filter backdrop-blur-lg rounded-xl p-6 border border-slate-700 hover:border-blue-500 transition card-shadow premium-card">
+        <div class="flex justify-between items-start mb-3">
+          <p class="text-slate-400 font-medium">Total Value</p>
+          <span class="text-blue-400 text-xs font-semibold bg-blue-900 bg-opacity-50 px-2 py-1 rounded">LIVE</span>
+        </div>
+        <p class="text-2xl font-bold text-white animate-number">${{ animatedPortfolioValue }}</p>
+        <div class="mt-3 mb-2">
+          <!-- Mini Line Chart SVG -->
+          <svg width="100%" height="40" viewBox="0 0 100 40" class="opacity-80 hover:opacity-100 transition">
+            <defs>
+              <linearGradient id="gradient1" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" style="stop-color:#7c3aed;stop-opacity:0.8" />
+                <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:0.1" />
+              </linearGradient>
+            </defs>
+            <polyline fill="url(#gradient1)" points="0,30 10,20 20,25 30,15 40,22 50,10 60,18 70,8 80,15 90,5 100,12" />
+            <polyline fill="none" stroke="#7c3aed" stroke-width="2" points="0,30 10,20 20,25 30,15 40,22 50,10 60,18 70,8 80,15 90,5 100,12" />
+          </svg>
+        </div>
+        <p class="text-xs text-slate-500 mt-2">Total portfolio value <span class="text-green-400 animate-live font-semibold">+${{ liveChange }}</span></p>
+      </div>
+
+      <div class="bg-slate-800 bg-opacity-50 backdrop-filter backdrop-blur-lg rounded-xl p-6 border border-slate-700 hover:border-green-500 transition card-shadow premium-card">
+        <p class="text-slate-400 font-medium mb-2">Total Invested</p>
+        <p class="text-2xl font-bold text-white animate-number">${{ animatedInvested }}</p>
+        <p class="text-xs text-slate-500 mt-4">Amount invested</p>
+      </div>
+
+      <div class="bg-slate-800 bg-opacity-50 backdrop-filter backdrop-blur-lg rounded-xl p-6 border border-slate-700 transition card-shadow premium-card">
+        <p class="text-slate-400 font-medium mb-2">Profit / Loss</p>
+        <p class="text-2xl font-bold text-green-400 animate-number">{{ animatedProfitLoss }}</p>
+        <p class="text-xs text-slate-500 mt-4"><span class="text-green-400 font-semibold">{{ animatedProfitLossPercent }}%</span> growth</p>
+      </div>
+
+      <div class="bg-slate-800 bg-opacity-50 backdrop-filter backdrop-blur-lg rounded-xl p-6 border border-slate-700 hover:border-purple-500 transition card-shadow premium-card">
+        <p class="text-slate-400 font-medium mb-2">Total Assets</p>
+        <p class="text-2xl font-bold text-white">{{ metrics.assetsCount || 0 }}</p>
+        <p class="text-xs text-slate-500 mt-4">Different assets held</p>
+      </div>
+    </ng-container>
+    <ng-template #skeletonMetrics>
+      <div class="bg-slate-800 bg-opacity-50 rounded-xl p-6 border border-slate-700">
+        <div class="skeleton h-5 w-24 mb-3"></div>
+        <div class="skeleton h-8 w-32 mb-4"></div>
+        <div class="skeleton h-12 w-full"></div>
+      </div>
+      <div class="bg-slate-800 bg-opacity-50 rounded-xl p-6 border border-slate-700">
+        <div class="skeleton h-5 w-24 mb-3"></div>
+        <div class="skeleton h-8 w-32 mb-4"></div>
+        <div class="skeleton h-12 w-full"></div>
+      </div>
+      <div class="bg-slate-800 bg-opacity-50 rounded-xl p-6 border border-slate-700">
+        <div class="skeleton h-5 w-24 mb-3"></div>
+        <div class="skeleton h-8 w-32 mb-4"></div>
+        <div class="skeleton h-12 w-full"></div>
+      </div>
+      <div class="bg-slate-800 bg-opacity-50 rounded-xl p-6 border border-slate-700">
+        <div class="skeleton h-5 w-24 mb-3"></div>
+        <div class="skeleton h-8 w-32 mb-4"></div>
+        <div class="skeleton h-12 w-full"></div>
+      </div>
+    </ng-template>
+  </div>
+
+  <!-- Portfolios Section -->
+  <div class="bg-slate-800 bg-opacity-50 backdrop-filter backdrop-blur-lg rounded-xl border border-slate-700 p-6">
+    <h2 class="text-xl font-bold text-white mb-6">Your Portfolios</h2>
+    
+    <div *ngIf="portfolios.length === 0" class="text-center py-12">
+      <p class="text-slate-400 mb-4">No portfolios yet</p>
+      <button class="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-2 rounded-lg transition">
+        Create Your First Portfolio
+      </button>
+    </div>
+
+    <div *ngIf="portfolios.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div *ngFor="let portfolio of portfolios" class="bg-slate-700 bg-opacity-50 rounded-lg p-4 border border-slate-600 hover:border-blue-500 transition cursor-pointer card-shadow premium-card transform hover:scale-105">
+        <h3 class="text-white font-semibold text-lg mb-2">{{ portfolio.name }}</h3>
+        <p class="text-slate-400 text-sm mb-4">{{ portfolio.description }}</p>
+        <div class="space-y-2">
+          <div class="flex justify-between items-center">
+            <span class="text-slate-400 text-sm">Value:</span>
+            <span class="text-white font-semibold">${{ portfolio.totalValue.toFixed(2) }}</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-slate-400 text-sm">P/L Percentage:</span>
+            <span class="text-green-400 font-semibold">{{ portfolio.profitLossPercentage.toFixed(2) }}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
