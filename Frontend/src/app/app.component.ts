@@ -12,7 +12,7 @@ import { AuthService } from './services/auth.service';
     <div class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <app-navbar *ngIf="showNavbar"></app-navbar>
       
-      <main [class]="showNavbar ? 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8' : ''">
+      <main [class]="showNavbar ? ' mx-auto  ' : ''">
         <router-outlet></router-outlet>
       </main>
     </div>
