@@ -3,12 +3,13 @@ import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { tap, map } from 'rxjs/operators';
 import { Portfolio, Holding, DashboardMetrics } from '../models';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class PortfolioService {
-  private apiUrl = 'http://localhost:8080/api/portfolios';
+  private apiUrl = `${environment.apiUrl}/portfolios`;
   private portfoliosSubject = new BehaviorSubject<Portfolio[]>([]);
   public portfolios$ = this.portfoliosSubject.asObservable();
 

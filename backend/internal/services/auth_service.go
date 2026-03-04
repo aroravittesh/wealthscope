@@ -119,10 +119,6 @@ func (s *AuthService) Login(
 		return "", "", errors.New("invalid credentials")
 	}
 
-	// if !user.IsEmailVerified {
-	// 	return "", "", errors.New("email not verified")
-	// }
-
 	// Generate refresh token
 	refreshToken, err := generateRefreshToken()
 	if err != nil {

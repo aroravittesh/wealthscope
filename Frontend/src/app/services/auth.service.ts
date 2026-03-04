@@ -1,7 +1,9 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
-import { tap, delay } from 'rxjs/operators';
+import { HttpClient } from '@angular/common/http';
+import { BehaviorSubject, Observable } from 'rxjs';
+import { tap } from 'rxjs/operators';
 import { User, AuthResponse } from '../models';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
@@ -14,96 +16,69 @@ export class AuthService {
   private isAuthenticatedSubject = new BehaviorSubject<boolean>(this.hasToken());
   public isAuthenticated$ = this.isAuthenticatedSubject.asObservable();
 
-  // Mock users database
-  private mockUsers: Map<string, { password: string; user: User }> = new Map([
-    ['test@example.com', {
-      password: 'password123',
-      user: {
-        id: '1',
-        email: 'test@example.com',
-        fullName: 'Test User',
-        role: 'USER',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
-    }],
-    ['demo@finsight.com', {
-      password: 'Demo@123',
-      user: {
-        id: '2',
-        email: 'demo@finsight.com',
-        fullName: 'Demo Account',
-        role: 'USER',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
-    }]
-  ]);
+  private apiUrl = environment.apiUrl;
 
-  constructor() {
+  constructor(private http: HttpClient) {
     this.checkTokenExpiry();
   }
 
   // ========================
-  // REGISTER (Mock Only)
+  // REGISTER (Backend)
   // ========================
-  register(email: string, password: string, fullName: string): Observable<AuthResponse> {
-
-    if (this.mockUsers.has(email)) {
-      return throwError(() => ({
-        error: { message: 'Email already registered' }
-      })).pipe(delay(800));
-    }
-
-    const newUser: User = {
-      id: Math.random().toString(36).substring(2, 9),
+  register(email: string, password: string, riskPreference: string): Observable<{ message: string }> {
+    const payload = {
       email,
-      fullName,
-      role: 'USER',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    this.mockUsers.set(email, {
       password,
-      user: newUser
-    });
-
-    const mockResponse: AuthResponse = {
-      token: this.generateMockToken(newUser),
-      refreshToken: this.generateMockToken(newUser),
-      user: newUser
+      risk_preference: riskPreference.toUpperCase()
     };
 
-    return of(mockResponse).pipe(
-      delay(1000),
-      tap(response => this.handleAuthResponse(response))
-    );
+    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/register`, payload);
   }
 
   // ========================
-  // LOGIN (Mock Only)
+  // LOGIN (Backend)
   // ========================
-  login(email: string, password: string): Observable<AuthResponse> {
+  login(email: string, password: string): Observable<void> {
+    const payload = { email, password };
 
-    const mockUser = this.mockUsers.get(email);
+    return this.http.post<{ access_token: string; refresh_token: string }>(
+      `${this.apiUrl}/auth/login`,
+      payload
+    ).pipe(
+      tap(response => {
+        localStorage.setItem('authToken', response.access_token);
+        localStorage.setItem('refreshToken', response.refresh_token);
+        this.isAuthenticatedSubject.next(true);
+      }),
+      tap(() => {
+        // Optional: fetch profile later to populate currentUser if needed
+      }),
+    ) as unknown as Observable<void>;
+  }
 
-    if (!mockUser || mockUser.password !== password) {
-      return throwError(() => ({
-        error: { message: 'Invalid email or password' }
-      })).pipe(delay(800));
-    }
+  // ========================
+  // PROFILE
+  // ========================
 
-    const mockResponse: AuthResponse = {
-      token: this.generateMockToken(mockUser.user),
-      refreshToken: this.generateMockToken(mockUser.user),
-      user: mockUser.user
+  getProfile(): Observable<{ email: string; risk_preference: string }> {
+    return this.http.get<{ email: string; risk_preference: string }>(`${this.apiUrl}/auth/profile`);
+  }
+
+  updateRiskPreference(riskPreference: string): Observable<{ email: string; risk_preference: string }> {
+    const payload = { risk_preference: riskPreference.toUpperCase() };
+    return this.http.put<{ email: string; risk_preference: string }>(`${this.apiUrl}/auth/profile`, payload);
+  }
+
+  // ========================
+  // CHANGE PASSWORD
+  // ========================
+
+  changePassword(oldPassword: string, newPassword: string): Observable<{ message: string }> {
+    const payload = {
+      old_password: oldPassword,
+      new_password: newPassword
     };
-
-    return of(mockResponse).pipe(
-      delay(800),
-      tap(response => this.handleAuthResponse(response))
-    );
+    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/change-password`, payload);
   }
 
   // ========================
@@ -163,18 +138,5 @@ export class AuthService {
     } catch {
       return true;
     }
-  }
-
-  private generateMockToken(user: User): string {
-    const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-    const payload = btoa(JSON.stringify({
-      sub: user.id,
-      email: user.email,
-      name: user.fullName,
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60)
-    }));
-    const signature = btoa('mock-signature');
-    return `${header}.${payload}.${signature}`;
   }
 }
