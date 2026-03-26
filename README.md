@@ -67,7 +67,7 @@ Frontend (Angular) → Backend (Go APIs) → Database (PostgreSQL) → ML Servic
 git clone https://github.com/aroravittesh/wealthscope.git
 cd wealthscope/backend
 go mod tidy
-go run main.go
+go run ./...
 ```
 
 ### Frontend
