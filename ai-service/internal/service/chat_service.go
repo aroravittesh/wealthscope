@@ -10,18 +10,27 @@ import (
     "wealthscope-ai/internal/rag"
 )
 
+// ChatServiceInterface allows mocking in unit tests
+type ChatServiceInterface interface {
+    ProcessMessage(sessionID string, message string) (string, error)
+}
+
+type chatService struct{}
+
+func NewChatService() ChatServiceInterface {
+    return &chatService{}
+}
+
+func (s *chatService) ProcessMessage(sessionID string, message string) (string, error) {
+    return ProcessMessage(sessionID, message)
+}
+
 func ProcessMessage(sessionID string, message string) (string, error) {
 
-    // Step 1: detect intent and extract ticker
     intentResult := ml.DetectIntent(message)
-
-    // Step 2: analyze sentiment
     sentiment := ml.AnalyzeSentiment(message)
-
-    // Step 3: build enriched prompt
     enriched := message
 
-    // Step 4: inject RAG context
     docs := rag.Retrieve(message, 3)
     if len(docs) > 0 {
         enriched += "\n\n[Relevant Financial Knowledge]"
@@ -30,7 +39,6 @@ func ProcessMessage(sessionID string, message string) (string, error) {
         }
     }
 
-    // Step 5: inject live market data if ticker found
     if intentResult.Ticker != "" {
         ticker := intentResult.Ticker
 
@@ -70,7 +78,6 @@ func ProcessMessage(sessionID string, message string) (string, error) {
         }
     }
 
-    // Step 6: inject system context
     enriched += fmt.Sprintf(
         "\n\n[System Context]\nIntent: %s | Ticker: %s | Sentiment: %s | Confidence: %.2f",
         intentResult.Intent,
