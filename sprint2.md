@@ -6,92 +6,162 @@
 
 * Implemented **Holdings module** (Add, Get, Delete)
 * Integrated holdings with portfolio system
-* Followed clean architecture:
-
-  * Repository layer (DB operations)
-  * Service layer (business logic)
-  * Handler layer (API endpoints)
+* Followed clean architecture (Repository → Service → Handler)
 * Secured endpoints using JWT authentication
+* Added API routes for holdings
+
+---
 
 ### Frontend
 
-* Integrated holdings feature end-to-end
-* Added route: `/portfolio/:portfolioId/holdings`
-* Displayed holdings data in table (fetched from backend)
-* Enabled add/delete operations with UI updates
-* Connected frontend with backend for:
+#### Portfolio Management UI
 
-  * Login
-  * Portfolio
-  * Holdings
-* Fixed UI issues:
+* Designed and implemented **Portfolio interface**
+* Enabled users to:
 
-  * Duplicate navbar removed
-  * Routing and state fixes
+  * Create and view portfolios
+  * Navigate into individual portfolios
+  * Manage holdings within each portfolio
 
-### API Compatibility Fix
+#### Dynamic Routing
+
+* Implemented route:
+
+  ```
+  /portfolio/:portfolioId/holdings
+  ```
+* Dynamically fetched data based on selected portfolio
+
+#### Holdings Management
+
+* Built UI to:
+
+  * Add holdings
+  * Delete holdings
+  * View asset details
+* Ensured instant UI updates after actions
+
+#### Data Integration
+
+* Connected frontend with backend APIs
+* Displayed real-time portfolio and holdings data
+* Maintained consistent UI state
+
+---
+
+### Frontend Fixes & Improvements
+
+* Fixed duplicate navbar issue
+* Resolved Angular compile errors (missing imports in `portfolio.service.ts`)
+* Improved routing and component structure
+* Ensured proper state handling
+
+---
+
+### Request Handling Fix
 
 * Normalized request payload:
 
   * `symbol` → uppercase
-  * `asset_type` → enum format (`STOCK`, `CRYPTO`, `ETF`)
-* Updated form validation to prevent invalid inputs
+  * `asset_type` → (`STOCK`, `CRYPTO`, `ETF`)
+* Updated validation to prevent invalid inputs
 
-### Error Handling
+---
+
+### Error Handling & UX
 
 * Display backend error messages in UI
 * Improved debugging for failed API requests
 
 ---
 
-## 🧪 Frontend Testing
+### AI Recommendations (Frontend)
 
-### Angular Unit Tests
+* Developed **AI Recommendations dashboard**
+
+* Included:
+
+  * Preferences panel (user input)
+  * Recommendations panel (output display)
+
+* User inputs:
+
+  * Portfolio tickers (AAPL, TSLA, etc.)
+  * Risk profile
+  * Investment horizon
+
+* Displayed results:
+
+  * Asset names
+  * Confidence scores
+  * BUY / HOLD / SELL decisions
+  * Expected returns
+  * Model explanation
+
+---
+
+### ML Integration
+
+* Sent user inputs to backend APIs
+* Triggered ML processing via backend
+* Received and rendered predictions dynamically
+* Displayed scores, decisions, and returns clearly
+
+---
+
+## 🧪 Testing
+
+### Frontend (Angular Unit Tests)
 
 * `holdings.component.spec.ts`
 
-  * Tests input normalization (uppercase symbol & asset_type)
-  * Verifies correct payload sent to backend
+  * Validates input normalization
+  * Ensures correct payload sent
 
 * `portfolio.service.spec.ts`
 
-  * Tests mapping of backend response:
+  * Maps backend response to frontend model
+  * Handles field transformation and parsing
 
-    * `portfolio_id → portfolioId`
-    * `asset_type → assetType`
-  * Validates number casting and date parsing
-
-* Fixed existing tests:
+* Fixed:
 
   * `login.spec.ts`
   * `signup.spec.ts`
   * `app.component.spec.ts`
 
-### Cypress E2E Test
+---
+
+### Frontend (Cypress E2E)
 
 * `login-form.cy.js`
 
-  * Visits `/auth/login`
-  * Inputs email & password
-  * Verifies submit button enables when form is valid
+  * Tests login UI interaction
+  * Validates form behavior
 
 ---
 
-## 🧪 Backend Testing
+### Backend Testing
 
-* Service layer unit tests using mock repository:
+* Service layer unit tests:
 
   * AddHolding
   * GetHoldings
   * DeleteHolding
 
-* Handler tests using `httptest`
+* Handler testing using `httptest`
 
-* API testing using curl:
+* Manual API testing using curl
 
-  * Register, Login
-  * Portfolio creation
-  * Holdings CRUD operations
+---
+
+### ML Testing
+
+* Unit tests for:
+
+  * intent detection
+  * sentiment analysis
+  * risk scoring
+* Verified correct outputs for different inputs
 
 ---
 
@@ -99,98 +169,51 @@
 
 ### Base URL
 
-```
+```id="x9n2wk"
 http://localhost:8080/api
 ```
 
 ### Auth
 
-#### Register
-
-```
-POST /auth/register
-```
-
-Body:
-
-```
-{
-  "email": "string",
-  "password": "string",
-  "risk_preference": "LOW | MEDIUM | HIGH"
-}
-```
-
-#### Login
-
-```
+```id="q4m7ld"
+POST /auth/register  
 POST /auth/login
 ```
 
----
-
 ### Portfolio
 
-#### Create Portfolio
-
-```
-POST /portfolios
-Authorization: Bearer <token>
-```
-
-#### Get Portfolios
-
-```
+```id="p2v8rs"
+POST /portfolios  
 GET /portfolios
-Authorization: Bearer <token>
 ```
-
----
 
 ### Holdings
 
-#### Add / Update Holding
-
-```
-POST /holdings
-Authorization: Bearer <token>
-```
-
-Body:
-
-```
-{
-  "portfolio_id": "uuid",
-  "symbol": "AAPL",
-  "asset_type": "STOCK",
-  "quantity": 10,
-  "avg_price": 150
-}
-```
-
-#### Get Holdings
-
-```
-GET /holdings/{portfolio_id}
-Authorization: Bearer <token>
-```
-
-#### Delete Holding
-
-```
+```id="c7k3zn"
+POST /holdings  
+GET /holdings/{portfolio_id}  
 DELETE /holdings/{id}
-Authorization: Bearer <token>
+```
+
+### Additional Endpoints
+
+```id="h5w1yx"
+GET /quote/:symbol  
+GET /company/:symbol  
+GET /news/:symbol  
+POST /intent  
+POST /sentiment  
+POST /risk  
+DELETE /chat/session/:session_id
 ```
 
 ---
 
 ## 🚀 Outcome
 
-* Fully functional **Holdings feature (end-to-end)**
-* Stable frontend-backend integration
-* Improved UI and error handling
-* Added unit and E2E test coverage
+* Fully functional holdings feature integrated end-to-end
+* Strong frontend-backend integration
+* AI dashboard integrated with backend
+* Added unit and E2E testing coverage
 
 ---
-
-
