@@ -29,15 +29,12 @@ export interface Portfolio {
 export interface Holding {
   id: string;
   portfolioId: string;
-  assetId: string;
+  symbol: string;
+  assetType: string; // stock | crypto | etf
   quantity: number;
-  purchasePrice: number;
-  currentPrice: number;
-  totalCost: number;
-  currentValue: number;
-  profitLoss: number;
-  profitLossPercentage: number;
-  purchasedAt: Date;
+  avgPrice: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Asset {
