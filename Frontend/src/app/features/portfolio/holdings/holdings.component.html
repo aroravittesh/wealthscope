@@ -1,0 +1,222 @@
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+  <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div>
+      <button
+        type="button"
+        class="text-slate-300 hover:text-white transition font-semibold"
+        (click)="backToPortfolios()"
+      >
+        ← Back
+      </button>
+
+      <h1 class="text-3xl font-bold text-white mt-3">
+        Holdings<span *ngIf="portfolio?.name">: {{ portfolio?.name }}</span>
+      </h1>
+      <p class="text-slate-400 mt-1">Add, edit, and track your holdings.</p>
+    </div>
+
+    <div class="flex gap-3">
+      <button
+        type="button"
+        class="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold px-6 py-3 rounded-lg transition glow-button transform hover:scale-105 hover:shadow-lg hover:shadow-blue-500/50"
+        (click)="openAddModal()"
+        [disabled]="mutating || loading"
+      >
+        + Add Holding
+      </button>
+    </div>
+  </div>
+
+  <div *ngIf="loading" class="mt-10 bg-slate-800 bg-opacity-50 rounded-xl border border-slate-700 p-6">
+    <p class="text-slate-400">Loading holdings...</p>
+  </div>
+
+  <div *ngIf="!loading && errorMessage" class="mt-8 bg-red-900/30 border border-red-500/50 rounded-xl p-4 text-red-200">
+    {{ errorMessage }}
+  </div>
+
+  <div *ngIf="!loading && !errorMessage" class="mt-8">
+    <div *ngIf="holdings.length === 0" class="text-center py-12">
+      <p class="text-slate-400 mb-4">No holdings yet</p>
+      <button
+        type="button"
+        class="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-2 rounded-lg transition"
+        (click)="openAddModal()"
+      >
+        Add your first holding
+      </button>
+    </div>
+
+    <div *ngIf="holdings.length > 0" class="bg-slate-800 bg-opacity-50 backdrop-filter backdrop-blur-lg rounded-xl border border-slate-700 p-4 md:p-6 overflow-x-auto">
+      <table class="min-w-full text-left">
+        <thead class="text-slate-400 text-xs uppercase tracking-wider">
+          <tr class="border-b border-slate-700">
+            <th class="py-3 px-3">Symbol</th>
+            <th class="py-3 px-3">Asset Type</th>
+            <th class="py-3 px-3">Quantity</th>
+            <th class="py-3 px-3">Avg Price</th>
+            <th class="py-3 px-3">Invested Value</th>
+            <th class="py-3 px-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="text-slate-200">
+          <tr *ngFor="let holding of holdings" class="border-t border-slate-700 hover:bg-slate-700/30 transition">
+            <td class="py-3 px-3">
+              <span class="font-mono text-white">{{ holding.symbol }}</span>
+            </td>
+            <td class="py-3 px-3">
+              <span class="text-slate-300 capitalize">{{ holding.assetType }}</span>
+            </td>
+            <td class="py-3 px-3 text-slate-300">
+              {{ holding.quantity }}
+            </td>
+            <td class="py-3 px-3 text-slate-300">
+              {{ (holding.avgPrice ?? 0).toFixed(2) }}
+            </td>
+            <td class="py-3 px-3">
+              <span class="text-white font-semibold">
+                ${{ investedValue(holding).toFixed(2) }}
+              </span>
+            </td>
+            <td class="py-3 px-3 text-right">
+              <div class="flex justify-end gap-3">
+                <button
+                  type="button"
+                  class="text-blue-400 hover:text-blue-200 font-semibold text-sm transition"
+                  (click)="openEditModal(holding)"
+                  [disabled]="mutating"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  class="text-red-400 hover:text-red-200 font-semibold text-sm transition"
+                  (click)="deleteHolding(holding)"
+                  [disabled]="mutating"
+                >
+                  Delete
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div *ngIf="showHoldingModal" class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm" (click)="closeModal()"></div>
+
+    <div class="relative z-10 w-full max-w-2xl mx-4">
+      <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl">
+        <div class="flex items-start justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-2xl font-bold text-white">
+              {{ isEditing ? 'Edit Holding' : 'Add Holding' }}
+            </h2>
+            <p class="text-slate-400 mt-1">
+              {{ isEditing ? 'Update quantity and avg price.' : 'Enter details to add a holding.' }}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            class="text-slate-400 hover:text-white transition text-2xl leading-none"
+            (click)="closeModal()"
+            [disabled]="mutating"
+          >
+            ✕
+          </button>
+        </div>
+
+        <form
+          (ngSubmit)="saveHolding()"
+          class="space-y-4"
+        >
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-slate-300 text-sm font-semibold mb-2">Symbol</label>
+              <input
+                class="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 outline-none focus:border-blue-500"
+                type="text"
+                placeholder="AAPL"
+                [(ngModel)]="holdingForm.symbol"
+                (input)="holdingForm.symbol = (holdingForm.symbol || '').toUpperCase()"
+                name="symbol"
+                required
+                [disabled]="isEditing"
+              />
+            </div>
+
+            <div>
+              <label class="block text-slate-300 text-sm font-semibold mb-2">Asset Type</label>
+              <select
+                class="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 outline-none focus:border-blue-500 capitalize"
+                [(ngModel)]="holdingForm.assetType"
+                name="assetType"
+                required
+                [disabled]="isEditing"
+              >
+                <option *ngFor="let opt of assetTypeOptions" [value]="opt.value">
+                  {{ opt.label }}
+                </option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-slate-300 text-sm font-semibold mb-2">Quantity</label>
+              <input
+                class="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 outline-none focus:border-blue-500"
+                type="number"
+                step="any"
+                min="0"
+                placeholder="e.g. 10"
+                [(ngModel)]="holdingForm.quantity"
+                name="quantity"
+                required
+              />
+            </div>
+
+            <div>
+              <label class="block text-slate-300 text-sm font-semibold mb-2">Avg Price</label>
+              <input
+                class="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 outline-none focus:border-blue-500"
+                type="number"
+                step="any"
+                min="0"
+                placeholder="e.g. 150.25"
+                [(ngModel)]="holdingForm.avgPrice"
+                name="avgPrice"
+                required
+              />
+            </div>
+          </div>
+
+          <div *ngIf="formErrorMessage" class="bg-red-900/30 border border-red-500/50 rounded-lg p-3 text-red-200">
+            {{ formErrorMessage }}
+          </div>
+
+          <div class="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              class="px-5 py-2 rounded-lg border border-slate-700 text-slate-200 hover:text-white hover:border-slate-500 transition font-semibold"
+              (click)="closeModal()"
+              [disabled]="mutating"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold px-6 py-2.5 rounded-lg transition glow-button transform hover:scale-105 disabled:opacity-60"
+              [disabled]="mutating"
+            >
+              {{ mutating ? 'Saving...' : (isEditing ? 'Update Holding' : 'Add Holding') }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
