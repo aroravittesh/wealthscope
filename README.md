@@ -1,130 +1,145 @@
-Wealthscope – Stock Portfolio Intelligence Platform
---------------------------------------------------
+# 🚀 WealthScope – Stock Portfolio Intelligence Platform
 
-Team Members:
+## 👥 Team Members
 
-1) Vittesh Arora - Backend
+* Vittesh Arora – Backend
+* Ansh Jain – Backend
+* Raghav Gupta – Frontend
+* Rishithaa Maligireddy – Frontend
 
-2) Ansh Jain - Backend
+---
 
-3) Raghav Gupta - Frontend
+## 📌 Project Overview
 
-4) Rishithaa Maligireddy - Frontend
+WealthScope is a full-stack Stock Portfolio Intelligence Platform designed to demonstrate real-world software engineering practices including system design, modular architecture, database management, machine learning integration, and cloud deployment.
 
+The platform allows users to manage portfolios, track holdings, and analyze performance through a scalable and maintainable architecture.
 
---------------------------------------------------
+---
 
-Project Description
-The Stock Portfolio Intelligence Platform (Wealthscope) is a full-stack web application developed to demonstrate core software engineering principles, including system design, modular architecture, database management, machine learning integration, and cloud deployment.
+## 🧠 Problem Statement
 
-The system enables users to manage stock portfolios, analyze historical performance, and receive data-driven insights through a clean and scalable architecture. The project emphasizes engineering rigor, maintainability, and extensibility rather than financial speculation or trading.
+Most portfolio tools lack transparency and many academic projects lack real-world architecture and deployment practices. WealthScope addresses this by building a clean, modular, and production-style system.
 
-The application is implemented using Angular for the frontend, Go (Golang) for backend RESTful services, a SQL database for persistence, and a Python-based machine learning microservice for analytics. The system is containerized and deployed using modern DevOps practices.
+---
 
---------------------------------------------------
+## 🎯 Objectives
 
-Problem Statement
-Existing portfolio tools often obscure analytical logic and provide limited transparency into how insights are generated. Additionally, many student projects lack real-world architectural depth and deployment considerations.
+* Build a full-stack system using modern technologies
+* Develop REST APIs in Go with clean architecture
+* Design a relational database
+* Integrate ML services
+* Implement CI/CD and deployment
 
-This project addresses these limitations by:
-- Designing a clear, modular system architecture
-- Providing explainable analytics
-- Applying industry-standard software engineering practices
-- Demonstrating end-to-end system deployment
+---
 
---------------------------------------------------
+## ⚙️ Tech Stack
 
-Project Objectives
-The primary objectives of this project are to:
-- Apply software engineering principles to design and implement a full-stack system
-- Develop RESTful APIs using Go with proper separation of concerns
-- Design and implement a relational database schema
-- Integrate machine learning services into a production-style architecture
-- Implement CI/CD pipelines and cloud deployment
-- Demonstrate teamwork, documentation quality, and version control practices
+* Frontend: Angular, TypeScript
+* Backend: Go (Golang), Gorilla Mux
+* Database: PostgreSQL
+* ML: Python
+* DevOps: Docker, CI/CD
 
---------------------------------------------------
+---
 
-Functional Requirements
-- User registration and authentication
-- Portfolio creation and management
-- Stock holding tracking
-- Portfolio performance analytics
-- ML-based insight generation
-- Visualization of analytics via dashboards
+## 🏗️ Architecture
 
---------------------------------------------------
+Frontend (Angular) → Backend (Go APIs) → Database (PostgreSQL) → ML Service (Python)
 
-Non-Functional Requirements
-- Scalability through modular services
-- Maintainability via clean code and documentation
-- Security through authentication and access control
-- Reliability via containerization and CI/CD
-- Portability through cloud-ready deployment
+---
 
---------------------------------------------------
+## 🔑 Features
 
-System Architecture
-The system follows a layered, service-oriented architecture consisting of:
-- Presentation Layer: Angular frontend handling user interaction and visualization
-- Application Layer: Go backend exposing RESTful APIs
-- Data Layer: SQL database for persistent storage
-- Analytics Layer: Python ML microservice for portfolio insights
+* User authentication (JWT)
+* Portfolio management
+* Holdings tracking
+* Portfolio analytics
+* ML-based insights
 
---------------------------------------------------
+---
 
-Machine Learning Component
-Machine learning is used as a decision-support tool rather than a predictive trading engine.
+## 🚀 Setup Instructions
 
-The models analyze historical data to:
-- Assess portfolio risk
-- Evaluate diversification
-- Classify volatility trends
+### Backend
 
-The focus is on explainability, reproducibility, and system integration, aligning with academic best practices.
+```bash
+git clone https://github.com/aroravittesh/wealthscope.git
+cd wealthscope/backend
+go mod tidy
+go run main.go
+```
 
---------------------------------------------------
+### Frontend
 
-Software Engineering Practices Demonstrated
-- Modular system design
-- REST API best practices
-- Database normalization
-- Version control using Git
-- Agile sprint-based development
-- CI/CD automation
-- Cloud deployment
+```bash
+cd Frontend
+npm install
+ng serve
+```
 
---------------------------------------------------
+### Database
 
-Project Scope and Constraints
+* Setup PostgreSQL
+* Run schema SQL
+
+---
+
+## 🧪 Testing
+
+* Backend: unit tests using Go testing
+* Frontend: tested using Cypress for login, portfolio, and holdings flows
+
+Run backend tests:
+
+```bash
+go test ./...
+```
+
+Run frontend tests:
+
+```bash
+cd Frontend
+npx cypress open
+```
+
+---
+
+## 📌 API Base URL
+
+http://localhost:8080/api
+
+---
+
+## 📦 Scope
 
 Included:
-- Portfolio analytics
-- ML-based insights
-- Cloud deployment
-- Full documentation
+
+* Portfolio & holdings management
+* Analytics & ML integration
 
 Excluded:
-- Real-time trading
-- Financial advice
-- External brokerage integration
 
---------------------------------------------------
+* Real-time trading
+* Financial advice
 
-Educational Disclaimer
-This project is developed solely for academic and educational purposes. It does not provide financial advice and should not be used for real-world investment decisions.
+---
 
---------------------------------------------------
+## ⚠️ Disclaimer
 
-Evaluation Criteria Alignment
-This project aligns with course evaluation criteria by demonstrating:
-- Technical correctness
-- System complexity appropriate for undergraduate level
-- Clear documentation and presentation
-- Practical application of theory
-- Team collaboration and project management
+This project is for academic purposes only and does not provide financial advice.
 
---------------------------------------------------
+---
 
-Conclusion
-The Stock Portfolio Intelligence Platform (Wealthscope) serves as a comprehensive demonstration of full-stack software engineering, integrating backend services, frontend design, machine learning, and cloud deployment into a cohesive and scalable system.
+## 📌 Contributors
+
+* https://github.com/aroravittesh
+* https://github.com/leo-Ansh2004
+* https://github.com/raghhavv03
+* https://github.com/Rishithaa-88
+
+---
+
+## ⭐ Conclusion
+
+WealthScope demonstrates a complete full-stack system with scalable architecture, integrating backend, frontend, and analytics into a single platform.
