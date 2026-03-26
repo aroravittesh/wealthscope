@@ -31,9 +31,14 @@ func main() {
 	}
 	portfolioHandler := handlers.NewPortfolioHandler(portfolioService)
 
+	// ✅ holdings
+	holdingRepo := repository.NewHoldingRepository(database)
+	holdingService := &services.HoldingService{Repo: holdingRepo}
+	holdingHandler := &handlers.HoldingHandler{Service: holdingService}
+
 	refreshTokenRepo := repository.NewRefreshTokenRepository(database)
 
-	// services (DEPENDENCIES WIRED CORRECTLY)
+	// services
 	authService := &services.AuthService{
 		UserRepo:         userRepo,
 		RefreshTokenRepo: refreshTokenRepo,
@@ -98,7 +103,23 @@ func main() {
 		middleware.AuthMiddleware(http.HandlerFunc(portfolioHandler.Delete)),
 	).Methods("DELETE")
 
-	// basic CORS middleware for local Angular dev
+	// ✅ holdings routes
+	api.Handle(
+		"/holdings",
+		middleware.AuthMiddleware(http.HandlerFunc(holdingHandler.Add)),
+	).Methods("POST")
+
+	api.Handle(
+		"/holdings/{portfolio_id}",
+		middleware.AuthMiddleware(http.HandlerFunc(holdingHandler.Get)),
+	).Methods("GET")
+
+	api.Handle(
+		"/holdings/{id}",
+		middleware.AuthMiddleware(http.HandlerFunc(holdingHandler.Delete)),
+	).Methods("DELETE")
+
+	// CORS middleware
 	withCORS := func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4200")
