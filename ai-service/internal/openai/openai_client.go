@@ -66,7 +66,6 @@ for any financial outcomes."
 Keep responses clear, structured, and professional.`
 }
 
-// CallOpenAI sends a message with full conversation history
 func CallOpenAI(sessionID string, userInput string) (string, error) {
     mu.Lock()
 
@@ -81,7 +80,7 @@ func CallOpenAI(sessionID string, userInput string) (string, error) {
         Content: userInput,
     })
 
-    // Build messages array: system prompt + full history
+    // Build messages: system prompt + full history
     messages := []Message{
         {Role: "system", Content: getSystemPrompt()},
     }
@@ -138,7 +137,7 @@ func CallOpenAI(sessionID string, userInput string) (string, error) {
         Role:    "assistant",
         Content: reply,
     })
-    // Keep history to last 10 messages to avoid token overflow
+    // Keep last 10 messages to avoid token overflow
     if len(conversationStore[sessionID]) > 10 {
         conversationStore[sessionID] = conversationStore[sessionID][len(conversationStore[sessionID])-10:]
     }
