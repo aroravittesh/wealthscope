@@ -32,7 +32,7 @@ func (r *UserRepositoryPG) Create(user *models.User) error {
 
 func (r *UserRepositoryPG) FindByEmail(email string) (*models.User, error) {
 	query := `
-		SELECT id, email, password_hash, role, is_email_verified, risk_preference, created_at
+		SELECT id, email, password_hash, role, risk_preference, created_at
 		FROM users
 		WHERE email = $1
 	`
@@ -45,7 +45,6 @@ func (r *UserRepositoryPG) FindByEmail(email string) (*models.User, error) {
 		&user.Email,
 		&user.PasswordHash,
 		&user.Role,
-		&user.IsEmailVerified,
 		&user.RiskPreference,
 		&user.CreatedAt,
 	)
@@ -59,7 +58,7 @@ func (r *UserRepositoryPG) FindByEmail(email string) (*models.User, error) {
 
 func (r *UserRepositoryPG) FindByID(id string) (*models.User, error) {
 	query := `
-		SELECT id, email, password_hash, role, is_email_verified, risk_preference, created_at
+		SELECT id, email, password_hash, role, risk_preference, created_at
 		FROM users
 		WHERE id = $1
 	`
@@ -72,7 +71,6 @@ func (r *UserRepositoryPG) FindByID(id string) (*models.User, error) {
 		&user.Email,
 		&user.PasswordHash,
 		&user.Role,
-		&user.IsEmailVerified,
 		&user.RiskPreference,
 		&user.CreatedAt,
 	)
@@ -94,12 +92,12 @@ func (r *UserRepositoryPG) UpdatePassword(userID string, passwordHash string) er
 	return err
 }
 
-func (r *UserRepositoryPG) UpdateEmailVerified(userID string) error {
+func (r *UserRepositoryPG) UpdateRiskPreference(userID string, riskPreference string) error {
 	query := `
 		UPDATE users
-		SET is_email_verified = TRUE
-		WHERE id = $1
+		SET risk_preference = $1
+		WHERE id = $2
 	`
-	_, err := r.DB.Exec(query, userID)
+	_, err := r.DB.Exec(query, riskPreference, userID)
 	return err
 }
