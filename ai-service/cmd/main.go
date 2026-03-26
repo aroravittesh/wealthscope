@@ -16,11 +16,12 @@ func main() {
     godotenv.Load()
 
     router := gin.Default()
+    router.SetTrustedProxies(nil)
 
     // CORS middleware
     router.Use(func(c *gin.Context) {
         c.Header("Access-Control-Allow-Origin", "*")
-        c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+        c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE")
         c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         if c.Request.Method == "OPTIONS" {
             c.AbortWithStatus(204)
@@ -36,14 +37,12 @@ func main() {
         })
     })
 
-    // Chat endpoint
-    // uses intent detection + sentiment + market data injection
-    // internally calls ml.DetectIntent, ml.AnalyzeSentiment, market.GetStockQuote
-    router.POST("/chat", handler.ChatHandler)
+    // Chat", handler.ChatHandler)
+
+    // ← NEW: Clear session route, right after /chat
+    router.DELETE("/chat/session/:session_id", handler.ClearChatHandler)
 
     // Risk scoring endpoint
-    // accepts a list of holdings with symbol, allocation, beta
-    // returns a risk report with score, level, and explanation
     router.POST("/risk", func(c *gin.Context) {
         var body struct {
             Holdings []ml.PortfolioHolding `json:"holdings"`
@@ -57,7 +56,6 @@ func main() {
     })
 
     // Stock quote endpoint
-    // returns real-time price, change, volume for a given symbol
     router.GET("/quote/:symbol", func(c *gin.Context) {
         symbol := c.Param("symbol")
         quote, err := market.GetStockQuote(symbol)
@@ -69,7 +67,6 @@ func main() {
     })
 
     // Company overview endpoint
-    // returns name, sector, industry, market cap, P/E, beta, 52W high/low
     router.GET("/company/:symbol", func(c *gin.Context) {
         symbol := c.Param("symbol")
         overview, err := market.GetCompanyOverview(symbol)
@@ -77,11 +74,10 @@ func main() {
             c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
             return
         }
-        c.JSON(http.StatusOK, overview)
+        c.JSON)
     })
 
     // Sentiment analysis endpoint
-    // accepts a text string and returns BULLISH, BEARISH, or NEUTRAL
     router.POST("/sentiment", func(c *gin.Context) {
         var body struct {
             Text string `json:"text"`
@@ -99,7 +95,6 @@ func main() {
     })
 
     // Intent detection endpoint
-    // accepts a message and returns detected intent, ticker, and confidence
     router.POST("/intent", func(c *gin.Context) {
         var body struct {
             Message string `json:"message"`
