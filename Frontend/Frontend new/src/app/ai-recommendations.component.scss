@@ -1,0 +1,86 @@
+/* You can add styles for the AI Recommendations component here */
+.ai-recommendations {
+  margin: 0 auto;
+  max-width: 900px;
+  color: #e0e7ef;
+}
+.ai-recommendations h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: #60a5fa;
+  letter-spacing: 0.01em;
+}
+.ai-recommendations .rec-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  align-items: flex-end;
+}
+.ai-recommendations label {
+  display: flex;
+  flex-direction: column;
+  font-size: 1rem;
+  color: #cbd5e1;
+}
+.ai-recommendations input,
+.ai-recommendations select {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #e0e7ef;
+  font-size: 1rem;
+  outline: none;
+  transition: border 0.2s;
+}
+.ai-recommendations input:focus,
+.ai-recommendations select:focus {
+  border-color: #60a5fa;
+}
+.ai-recommendations button[type="submit"] {
+  background: linear-gradient(90deg, #2563eb, #7c3aed);
+  color: #fff;
+  font-weight: 600;
+  padding: 0.6rem 1.5rem;
+  border: none;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px 0 rgba(124, 58, 237, 0.10);
+  transition: background 0.3s, box-shadow 0.3s, transform 0.2s;
+}
+.ai-recommendations button[type="submit"]:hover {
+  background: linear-gradient(90deg, #1e40af, #a78bfa);
+  box-shadow: 0 4px 16px 0 rgba(96, 165, 250, 0.18);
+  transform: scale(1.04);
+}
+.ai-recommendations table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  background: #0f172a;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 2px 12px 0 rgba(30, 58, 138, 0.08);
+}
+.ai-recommendations th, .ai-recommendations td {
+  border: 1px solid #334155;
+  padding: 0.5rem;
+  text-align: center;
+}
+.ai-recommendations th {
+  background: #1e293b;
+  color: #60a5fa;
+  font-weight: 600;
+}
+.ai-recommendations .error {
+  color: #f87171;
+  margin-top: 1rem;
+  font-weight: 600;
+}
+.ai-recommendations tr:hover {
+  background: #1e293b;
+  transition: background 0.2s;
+}
