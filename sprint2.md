@@ -1,82 +1,65 @@
-# 📅 Sprint 2 – Holdings & Full-Stack Integration
+# 📅 Sprint 2 – Holdings, Integration & Testing
 
-## 🎯 Sprint Goal
+## 🎯 Work Completed
 
-Implement the **Holdings module**, fix frontend issues, and complete end-to-end integration between frontend and backend.
+### Backend
 
----
+* Implemented **Holdings module** (Add, Get, Delete)
+* Integrated holdings with portfolio system
+* Followed clean architecture:
 
-## ✅ Features Implemented
+  * Repository layer (DB operations)
+  * Service layer (business logic)
+  * Handler layer (API endpoints)
+* Secured endpoints using JWT authentication
 
-### 1. Holdings Module (Backend)
+### Frontend
 
-* Add, fetch, delete holdings
-* Integrated with portfolio system
-* Secure APIs using JWT
-* Clean architecture: Repository → Service → Handler
-
----
-
-### 2. Frontend Integration (Holdings)
-
-* Implemented holdings page at `/portfolio/:portfolioId/holdings`
-* Portfolio ID dynamically loaded from URL
-* Holdings table displays backend data
-* Auto-refresh after add/delete operations
-
----
-
-### 3. Frontend Fixes & Improvements
-
-* Fixed **duplicate navbar issue**
-* Resolved Angular build errors (missing imports in `portfolio.service.ts`)
-* Connected backend with:
+* Integrated holdings feature end-to-end
+* Added route: `/portfolio/:portfolioId/holdings`
+* Displayed holdings data in table (fetched from backend)
+* Enabled add/delete operations with UI updates
+* Connected frontend with backend for:
 
   * Login
   * Portfolio
   * Holdings
+* Fixed UI issues:
+
+  * Duplicate navbar removed
+  * Routing and state fixes
+
+### API Compatibility Fix
+
+* Normalized request payload:
+
+  * `symbol` → uppercase
+  * `asset_type` → enum format (`STOCK`, `CRYPTO`, `ETF`)
+* Updated form validation to prevent invalid inputs
+
+### Error Handling
+
+* Display backend error messages in UI
+* Improved debugging for failed API requests
 
 ---
 
-### 4. Request Handling Fix (Important)
+## 🧪 Frontend Testing
 
-* Fixed payload mismatch between frontend and backend:
-
-  * `symbol` → converted to uppercase
-  * `asset_type` → enforced enum format (`STOCK`, `CRYPTO`, `ETF`)
-* Updated form validation to prevent invalid casing
-
----
-
-### 5. Error Handling & UX
-
-* Improved error handling:
-
-  * Displays backend error messages in UI
-  * Better debugging during API failures
-
----
-
-### 6. Testing
-
-#### Backend
-
-* Unit tests for service layer (mock repository)
-* Handler tests using `httptest`
-* API testing using curl
-
-#### Frontend (Angular Unit Tests)
+### Angular Unit Tests
 
 * `holdings.component.spec.ts`
 
-  * Validates input normalization (uppercase symbol & asset type)
-  * Ensures correct payload sent to backend
+  * Tests input normalization (uppercase symbol & asset_type)
+  * Verifies correct payload sent to backend
 
 * `portfolio.service.spec.ts`
 
-  * Maps backend response → frontend model
-  * Handles field conversions (`portfolio_id → portfolioId`)
-  * Number casting and date parsing
+  * Tests mapping of backend response:
+
+    * `portfolio_id → portfolioId`
+    * `asset_type → assetType`
+  * Validates number casting and date parsing
 
 * Fixed existing tests:
 
@@ -84,46 +67,130 @@ Implement the **Holdings module**, fix frontend issues, and complete end-to-end 
   * `signup.spec.ts`
   * `app.component.spec.ts`
 
-#### Frontend (Cypress E2E)
+### Cypress E2E Test
 
 * `login-form.cy.js`
 
-  * Tests login UI
-  * Validates form interaction
-  * Ensures submit button enables correctly
+  * Visits `/auth/login`
+  * Inputs email & password
+  * Verifies submit button enables when form is valid
 
 ---
 
-## 🎥 Sprint Demo Flow
+## 🧪 Backend Testing
 
-* Navigate to `/portfolio`
-* Open a portfolio → `/portfolio/:portfolioId/holdings`
-* Click **+ Add Holding**
-* Enter symbol, asset type, quantity, avg price
-* Submit form
-* Verify:
+* Service layer unit tests using mock repository:
 
-  * Holdings list updates
-  * Error message shows if request fails
+  * AddHolding
+  * GetHoldings
+  * DeleteHolding
+
+* Handler tests using `httptest`
+
+* API testing using curl:
+
+  * Register, Login
+  * Portfolio creation
+  * Holdings CRUD operations
 
 ---
 
-## ⚠️ Challenges Faced
+## 📡 Backend API Documentation
 
-* Frontend build failures due to missing imports
-* Payload mismatch between frontend and backend
-* Debugging full-stack integration
-* Handling authentication across API calls
-* Fixing UI inconsistencies
+### Base URL
+
+```
+http://localhost:8080/api
+```
+
+### Auth
+
+#### Register
+
+```
+POST /auth/register
+```
+
+Body:
+
+```
+{
+  "email": "string",
+  "password": "string",
+  "risk_preference": "LOW | MEDIUM | HIGH"
+}
+```
+
+#### Login
+
+```
+POST /auth/login
+```
+
+---
+
+### Portfolio
+
+#### Create Portfolio
+
+```
+POST /portfolios
+Authorization: Bearer <token>
+```
+
+#### Get Portfolios
+
+```
+GET /portfolios
+Authorization: Bearer <token>
+```
+
+---
+
+### Holdings
+
+#### Add / Update Holding
+
+```
+POST /holdings
+Authorization: Bearer <token>
+```
+
+Body:
+
+```
+{
+  "portfolio_id": "uuid",
+  "symbol": "AAPL",
+  "asset_type": "STOCK",
+  "quantity": 10,
+  "avg_price": 150
+}
+```
+
+#### Get Holdings
+
+```
+GET /holdings/{portfolio_id}
+Authorization: Bearer <token>
+```
+
+#### Delete Holding
+
+```
+DELETE /holdings/{id}
+Authorization: Bearer <token>
+```
 
 ---
 
 ## 🚀 Outcome
 
 * Fully functional **Holdings feature (end-to-end)**
-* Stable frontend with correct API integration
-* Improved UX and error handling
-* Complete test coverage (unit + E2E)
+* Stable frontend-backend integration
+* Improved UI and error handling
+* Added unit and E2E test coverage
 
 ---
+
 
