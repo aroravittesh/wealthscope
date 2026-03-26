@@ -21,7 +21,7 @@ func main() {
     // CORS middleware
     router.Use(func(c *gin.Context) {
         c.Header("Access-Control-Allow-Origin", "*")
-        c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE")
+        c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
         c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         if c.Request.Method == "OPTIONS" {
             c.AbortWithStatus(204)
@@ -37,10 +37,8 @@ func main() {
         })
     })
 
-    // Chat", handler.ChatHandler)
-
-    // ← NEW: Clear session route, right after /chat
-    router.DELETE("/chat/session/:session_id", handler.ClearChatHandler)
+    // Chat endpoint
+    router.POST("/chat", handler.ChatHandler)
 
     // Risk scoring endpoint
     router.POST("/risk", func(c *gin.Context) {
@@ -74,9 +72,25 @@ func main() {
             c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
             return
         }
-        c.JSON)
+        c.JSON(http.StatusOK, overview)
     })
+// News endpoint
+router.GET("/news/:symbol", func(c *gin.Context) {
+    symbol := c.Param("symbol")
+    news, err := market.GetMarketNews(symbol)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+    if len(news) == 0 {
+        c.JSON(http.StatusNotFound, gin.H{"error": "No news found for " + symbol})
+        return
+    }
+    c.JSON(http.StatusOK, gin.H{"symbol": symbol, "news": news})
+})
 
+// Clear session endpoint
+router.DELETE("/chat/session/:session_id", handler.ClearChatHandler)
     // Sentiment analysis endpoint
     router.POST("/sentiment", func(c *gin.Context) {
         var body struct {

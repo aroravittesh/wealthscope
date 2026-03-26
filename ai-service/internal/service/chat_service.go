@@ -7,9 +7,11 @@ import (
     "wealthscope-ai/internal/market"
     "wealthscope-ai/internal/ml"
     "wealthscope-ai/internal/openai"
+    "wealthscope-ai/internal/rag"
 )
 
 func ProcessMessage(sessionID string, message string) (string, error) {
+
     // Step 1: detect intent and extract ticker
     intentResult := ml.DetectIntent(message)
 
@@ -19,7 +21,16 @@ func ProcessMessage(sessionID string, message string) (string, error) {
     // Step 3: build enriched prompt
     enriched := message
 
-    // Step 4: inject live market data if ticker found
+    // Step 4: inject RAG context
+    docs := rag.Retrieve(message, 3)
+    if len(docs) > 0 {
+        enriched += "\n\n[Relevant Financial Knowledge]"
+        for _, doc := range docs {
+            enriched += fmt.Sprintf("\n- %s", doc.Content)
+        }
+    }
+
+    // Step 5: inject live market data if ticker found
     if intentResult.Ticker != "" {
         ticker := intentResult.Ticker
 
@@ -59,7 +70,7 @@ func ProcessMessage(sessionID string, message string) (string, error) {
         }
     }
 
-    // Step 5: inject system context
+    // Step 6: inject system context
     enriched += fmt.Sprintf(
         "\n\n[System Context]\nIntent: %s | Ticker: %s | Sentiment: %s | Confidence: %.2f",
         intentResult.Intent,
