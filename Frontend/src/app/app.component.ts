@@ -9,7 +9,7 @@ import { AuthService } from './services/auth.service';
   standalone: true,
   imports: [RouterOutlet, CommonModule, NavbarComponent],
   template: `
-    <div class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <app-navbar *ngIf="showNavbar"></app-navbar>
       
       <main [class]="showNavbar ? ' mx-auto  ' : ''">
