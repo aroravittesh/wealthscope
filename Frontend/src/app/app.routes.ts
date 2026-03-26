@@ -22,6 +22,8 @@ import { AdminDashboardComponent } from './features/admin-dashboard.component';
 import { ReportingAnalyticsComponent } from './features/reporting-analytics.component';
 import { SystemHealthComponent } from './features/system-health.component';
 import { DevopsTestingComponent } from './features/devops-testing.component';
+import { PortfolioListComponent } from './features/portfolio/portfolio-list/portfolio-list.component';
+import { HoldingsComponent } from './features/portfolio/holdings/holdings.component';
 
 
 export const routes: Routes = [
@@ -64,7 +66,12 @@ export const routes: Routes = [
   {
     path: 'portfolio',
     canActivate: [AuthGuard],
-    children: []
+    component: PortfolioListComponent
+  },
+  {
+    path: 'portfolio/:portfolioId/holdings',
+    canActivate: [AuthGuard],
+    component: HoldingsComponent
   },
   // Product routes
   {
