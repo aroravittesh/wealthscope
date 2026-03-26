@@ -7,7 +7,6 @@ type User struct {
 	Email           string
 	PasswordHash    string
 	Role            string
-	IsEmailVerified bool
 	RiskPreference  string
 	CreatedAt       time.Time
 }

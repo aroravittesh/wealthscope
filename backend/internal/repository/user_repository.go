@@ -7,5 +7,5 @@ type UserRepository interface {
 	FindByEmail(email string) (*models.User, error)
 	FindByID(id string) (*models.User, error)
 	UpdatePassword(userID string, passwordHash string) error
-	UpdateEmailVerified(userID string) error
+	UpdateRiskPreference(userID string, riskPreference string) error
 }

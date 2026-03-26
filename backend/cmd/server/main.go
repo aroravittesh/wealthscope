@@ -26,10 +26,10 @@ func main() {
 	// repositories
 	userRepo := repository.NewUserRepository(database)
 	portfolioRepo := repository.NewPortfolioRepository(database)
-    portfolioService := &services.PortfolioService{
-	PortfolioRepo: portfolioRepo,
-    }
-    portfolioHandler := handlers.NewPortfolioHandler(portfolioService)
+	portfolioService := &services.PortfolioService{
+		PortfolioRepo: portfolioRepo,
+	}
+	portfolioHandler := handlers.NewPortfolioHandler(portfolioService)
 
 	refreshTokenRepo := repository.NewRefreshTokenRepository(database)
 
@@ -41,51 +41,80 @@ func main() {
 
 	// handlers
 	authHandler := handlers.NewAuthHandler(authService)
+	profileHandler := handlers.NewProfileHandler(userRepo)
 
 	router := mux.NewRouter()
 
+	// Subrouter for API routes
+	api := router.PathPrefix("/api").Subrouter()
+
 	// health check
-	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	api.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("WealthScope backend connected to Supabase"))
 	}).Methods("GET")
 
 	// auth routes
-	router.HandleFunc("/auth/register", authHandler.Register).Methods("POST")
-	router.HandleFunc("/auth/login", authHandler.Login).Methods("POST")
-	router.HandleFunc("/auth/refresh", handlers.Refresh(authService)).Methods("POST")
-	router.HandleFunc("/auth/logout", handlers.Logout(authService)).Methods("POST")
+	api.HandleFunc("/auth/register", authHandler.Register).Methods("POST")
+	api.HandleFunc("/auth/login", authHandler.Login).Methods("POST")
+	api.HandleFunc("/auth/refresh", handlers.Refresh(authService)).Methods("POST")
+	api.HandleFunc("/auth/logout", handlers.Logout(authService)).Methods("POST")
 
-	router.Handle(
+	api.Handle(
 		"/auth/change-password",
 		middleware.AuthMiddleware(
 			handlers.ChangePassword(authService),
 		),
 	).Methods("POST")
 
-	router.Handle(
+	// profile routes
+	api.Handle(
+		"/auth/profile",
+		middleware.AuthMiddleware(http.HandlerFunc(profileHandler.GetProfile)),
+	).Methods("GET")
+
+	api.Handle(
+		"/auth/profile",
+		middleware.AuthMiddleware(http.HandlerFunc(profileHandler.UpdateProfile)),
+	).Methods("PUT")
+
+	// portfolio routes
+	api.Handle(
 		"/portfolios",
 		middleware.AuthMiddleware(http.HandlerFunc(portfolioHandler.Create)),
 	).Methods("POST")
-	
-	router.Handle(
+
+	api.Handle(
 		"/portfolios",
 		middleware.AuthMiddleware(http.HandlerFunc(portfolioHandler.GetUserPortfolios)),
 	).Methods("GET")
-	
-	router.Handle(
+
+	api.Handle(
 		"/portfolios/{id}",
 		middleware.AuthMiddleware(http.HandlerFunc(portfolioHandler.Rename)),
 	).Methods("PUT")
-	
-	router.Handle(
+
+	api.Handle(
 		"/portfolios/{id}",
 		middleware.AuthMiddleware(http.HandlerFunc(portfolioHandler.Delete)),
 	).Methods("DELETE")
-	
-	
-	
 
+	// basic CORS middleware for local Angular dev
+	withCORS := func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4200")
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+
+			h.ServeHTTP(w, r)
+		})
+	}
 
 	log.Println("WealthScope server running on port", port)
-	log.Fatal(http.ListenAndServe(":"+port, router))
+	log.Fatal(http.ListenAndServe(":"+port, withCORS(router)))
 }
