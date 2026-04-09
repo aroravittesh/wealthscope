@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable } from 'rxjs';
-import { tap } from 'rxjs/operators';
-import { User, AuthResponse } from '../models';
+import { BehaviorSubject, Observable, of } from 'rxjs';
+import { catchError, map, switchMap, tap } from 'rxjs/operators';
+import { User } from '../models';
 import { environment } from '../../environments/environment';
 
 @Injectable({
@@ -19,6 +19,7 @@ export class AuthService {
   private apiUrl = environment.apiUrl;
 
   constructor(private http: HttpClient) {
+    this.bootstrapSession();
     this.checkTokenExpiry();
   }
 
@@ -50,10 +51,10 @@ export class AuthService {
         localStorage.setItem('refreshToken', response.refresh_token);
         this.isAuthenticatedSubject.next(true);
       }),
-      tap(() => {
-        // Optional: fetch profile later to populate currentUser if needed
-      }),
-    ) as unknown as Observable<void>;
+      switchMap(() => this.getProfile()),
+      tap(profile => this.setUserFromProfile(profile)),
+      map(() => undefined)
+    );
   }
 
   // ========================
@@ -85,6 +86,52 @@ export class AuthService {
   // LOGOUT
   // ========================
   logout(): void {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (refreshToken) {
+      this.http.post<{ message: string }>(
+        `${this.apiUrl}/auth/logout`,
+        { refresh_token: refreshToken }
+      ).pipe(catchError(() => of(null))).subscribe();
+    }
+    this.clearSession();
+  }
+
+  logoutLocalOnly(): void {
+    this.clearSession();
+  }
+
+  refreshAccessToken(): Observable<string> {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) {
+      return of('');
+    }
+
+    return this.http.post<{ access_token: string; refresh_token: string }>(
+      `${this.apiUrl}/auth/refresh`,
+      { refresh_token: refreshToken }
+    ).pipe(
+      tap(tokens => {
+        localStorage.setItem('authToken', tokens.access_token);
+        localStorage.setItem('refreshToken', tokens.refresh_token);
+        this.isAuthenticatedSubject.next(true);
+      }),
+      map(tokens => tokens.access_token),
+      catchError(() => {
+        this.clearSession();
+        return of('');
+      })
+    );
+  }
+
+  getAccessToken(): string | null {
+    return localStorage.getItem('authToken');
+  }
+
+  getRefreshToken(): string | null {
+    return localStorage.getItem('refreshToken');
+  }
+
+  private clearSession(): void {
     localStorage.removeItem('authToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
@@ -103,16 +150,9 @@ export class AuthService {
     return this.isAuthenticatedSubject.value;
   }
 
-  private handleAuthResponse(response: AuthResponse): void {
-    localStorage.setItem('authToken', response.token);
-    localStorage.setItem('refreshToken', response.refreshToken);
-    localStorage.setItem('user', JSON.stringify(response.user));
-    this.currentUserSubject.next(response.user);
-    this.isAuthenticatedSubject.next(true);
-  }
-
   private hasToken(): boolean {
-    return !!localStorage.getItem('authToken');
+    const token = localStorage.getItem('authToken');
+    return !!token && !this.isTokenExpired();
   }
 
   private getUserFromStorage(): User | null {
@@ -123,7 +163,7 @@ export class AuthService {
   private checkTokenExpiry(): void {
     setInterval(() => {
       if (this.hasToken() && this.isTokenExpired()) {
-        this.logout();
+        this.logoutLocalOnly();
       }
     }, 60000);
   }
@@ -137,6 +177,38 @@ export class AuthService {
       return decoded.exp * 1000 < Date.now();
     } catch {
       return true;
+    }
+  }
+
+  private setUserFromProfile(profile: { email: string; risk_preference: string }): void {
+    const user: User = {
+      email: profile.email,
+      riskPreference: profile.risk_preference
+    };
+    localStorage.setItem('user', JSON.stringify(user));
+    this.currentUserSubject.next(user);
+  }
+
+  private bootstrapSession(): void {
+    if (!localStorage.getItem('authToken')) {
+      return;
+    }
+
+    if (this.isTokenExpired()) {
+      this.clearSession();
+      return;
+    }
+
+    this.isAuthenticatedSubject.next(true);
+
+    if (!this.getCurrentUser()) {
+      this.getProfile().pipe(
+        tap(profile => this.setUserFromProfile(profile)),
+        catchError(() => {
+          this.clearSession();
+          return of(null);
+        })
+      ).subscribe();
     }
   }
 }

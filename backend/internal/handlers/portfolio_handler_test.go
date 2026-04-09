@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -65,6 +66,32 @@ func (f *fakePortfolioRepo) Delete(id string) error {
 
 var _ repository.PortfolioRepository = (*fakePortfolioRepo)(nil)
 
+type summaryFakeHoldingRepo struct{}
+
+func (summaryFakeHoldingRepo) CreateOrUpdate(h *models.Holding) error {
+	return errors.New("not implemented")
+}
+
+func (summaryFakeHoldingRepo) GetByPortfolio(portfolioID string) ([]models.Holding, error) {
+	return nil, nil
+}
+
+func (summaryFakeHoldingRepo) Delete(id string) error { return errors.New("not implemented") }
+
+func (summaryFakeHoldingRepo) FindBySymbol(portfolioID, symbol string) (*models.Holding, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (summaryFakeHoldingRepo) GetByID(id string) (*models.Holding, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (summaryFakeHoldingRepo) UpdateByID(id string, quantity float64, avgPrice float64) error {
+	return errors.New("not implemented")
+}
+
+var _ repository.HoldingRepository = (*summaryFakeHoldingRepo)(nil)
+
 func TestPortfolioHandler_Create_Success(t *testing.T) {
 	repo := &fakePortfolioRepo{
 		createFn: func(p *models.Portfolio) error {
@@ -72,7 +99,7 @@ func TestPortfolioHandler_Create_Success(t *testing.T) {
 			return nil
 		},
 	}
-	svc := &services.PortfolioService{PortfolioRepo: repo}
+	svc := &services.PortfolioService{PortfolioRepo: repo, HoldingRepo: summaryFakeHoldingRepo{}}
 	h := NewPortfolioHandler(svc)
 
 	ctx := context.WithValue(context.Background(), middleware.UserIDKey, "u1")
@@ -138,7 +165,7 @@ func TestPortfolioHandler_Delete_Success(t *testing.T) {
 		},
 		deleteFn: func(id string) error { return nil },
 	}
-	svc := &services.PortfolioService{PortfolioRepo: repo}
+	svc := &services.PortfolioService{PortfolioRepo: repo, HoldingRepo: summaryFakeHoldingRepo{}}
 	h := NewPortfolioHandler(svc)
 
 	ctx := context.WithValue(context.Background(), middleware.UserIDKey, "u1")
@@ -153,3 +180,23 @@ func TestPortfolioHandler_Delete_Success(t *testing.T) {
 	}
 }
 
+func TestPortfolioHandler_GetSummary_NotFound(t *testing.T) {
+	repo := &fakePortfolioRepo{
+		getByIDFn: func(id string) (*models.Portfolio, error) {
+			return nil, sql.ErrNoRows
+		},
+	}
+	svc := &services.PortfolioService{PortfolioRepo: repo, HoldingRepo: summaryFakeHoldingRepo{}}
+	h := NewPortfolioHandler(svc)
+
+	ctx := context.WithValue(context.Background(), middleware.UserIDKey, "u1")
+	req := httptest.NewRequest(http.MethodGet, "/portfolios/p1/summary", nil).WithContext(ctx)
+	req = mux.SetURLVars(req, map[string]string{"id": "p1"})
+	rec := httptest.NewRecorder()
+
+	h.GetSummary(rec, req)
+
+	if rec.Result().StatusCode != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rec.Result().StatusCode)
+	}
+}
