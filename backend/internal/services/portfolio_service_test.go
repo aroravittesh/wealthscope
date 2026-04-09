@@ -4,26 +4,38 @@ import (
 	"errors"
 	"testing"
 
+	"wealthscope-backend/internal/market"
 	"wealthscope-backend/internal/models"
 	"wealthscope-backend/internal/repository"
 )
 
-type fakePortfolioRepository struct {
-	createFn        func(p *models.Portfolio) error
-	getByUserFn     func(userID string) ([]models.Portfolio, error)
-	getByIDFn       func(id string) (*models.Portfolio, error)
-	updateNameFn    func(id string, name string) error
-	deleteFn        func(id string) error
+type stubUnitPrices struct {
+	fn func(symbol string, avg float64) float64
+}
 
-	createCalls     int
-	lastCreated     *models.Portfolio
+func (s stubUnitPrices) UnitPrice(symbol string, avgPrice float64) float64 {
+	if s.fn == nil {
+		return avgPrice
+	}
+	return s.fn(symbol, avgPrice)
+}
+
+type fakePortfolioRepository struct {
+	createFn     func(p *models.Portfolio) error
+	getByUserFn  func(userID string) ([]models.Portfolio, error)
+	getByIDFn    func(id string) (*models.Portfolio, error)
+	updateNameFn func(id string, name string) error
+	deleteFn     func(id string) error
+
+	createCalls int
+	lastCreated *models.Portfolio
 
 	updateNameCalls int
-	lastUpdatedID    string
-	lastUpdatedName  string
+	lastUpdatedID   string
+	lastUpdatedName string
 
-	deleteCalls    int
-	lastDeletedID  string
+	deleteCalls   int
+	lastDeletedID string
 }
 
 func (f *fakePortfolioRepository) Create(portfolio *models.Portfolio) error {
@@ -184,3 +196,104 @@ func TestPortfolioService_Delete_Success(t *testing.T) {
 	}
 }
 
+func TestPortfolioService_GetPortfolioSummary_Unauthorized(t *testing.T) {
+	repo := &fakePortfolioRepository{
+		getByIDFn: func(id string) (*models.Portfolio, error) {
+			return &models.Portfolio{ID: id, UserID: "other", Name: "X"}, nil
+		},
+	}
+	holdings := &fakeHoldingRepository{}
+	svc := &PortfolioService{PortfolioRepo: repo, HoldingRepo: holdings}
+
+	_, err := svc.GetPortfolioSummary("u1", "p1")
+	if err == nil || err.Error() != "unauthorized" {
+		t.Fatalf("expected unauthorized, got %v", err)
+	}
+}
+
+func TestPortfolioService_GetPortfolioSummary_SuccessAndAllocation(t *testing.T) {
+	repo := &fakePortfolioRepository{
+		getByIDFn: func(id string) (*models.Portfolio, error) {
+			return &models.Portfolio{ID: id, UserID: "u1", Name: "Main"}, nil
+		},
+	}
+	holdings := &fakeHoldingRepository{
+		getByPortfolioFn: func(portfolioID string) ([]models.Holding, error) {
+			return []models.Holding{
+				{Symbol: "AAA", AssetType: "stock", Quantity: 10, AvgPrice: 100},
+				{Symbol: "BBB", AssetType: "etf", Quantity: 5, AvgPrice: 200},
+			}, nil
+		},
+	}
+	svc := &PortfolioService{PortfolioRepo: repo, HoldingRepo: holdings, Prices: market.Passthrough{}}
+
+	s, err := svc.GetPortfolioSummary("u1", "p1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if s.PortfolioName != "Main" || s.TotalInvested != 2000 || s.TotalPortfolioValue != 2000 {
+		t.Fatalf("unexpected totals: %#v", s)
+	}
+	if s.TotalProfitLoss != 0 || s.ProfitLossPercentage != 0 {
+		t.Fatalf("with passthrough prices P/L should be zero, got %#v", s)
+	}
+	if len(s.AssetAllocation) != 2 {
+		t.Fatalf("expected 2 allocation rows, got %d", len(s.AssetAllocation))
+	}
+	if s.AssetAllocation[0].Percent != 50 || s.AssetAllocation[1].Percent != 50 {
+		t.Fatalf("expected 50/50 allocation, got %#v", s.AssetAllocation)
+	}
+	if s.AssetAllocation[0].CostBasis != 1000 || s.AssetAllocation[0].CurrentPrice != 100 {
+		t.Fatalf("unexpected row 0 cost/price: %#v", s.AssetAllocation[0])
+	}
+}
+
+func TestPortfolioService_GetPortfolioSummary_MarkToMarket(t *testing.T) {
+	repo := &fakePortfolioRepository{
+		getByIDFn: func(id string) (*models.Portfolio, error) {
+			return &models.Portfolio{ID: id, UserID: "u1", Name: "Main"}, nil
+		},
+	}
+	holdings := &fakeHoldingRepository{
+		getByPortfolioFn: func(portfolioID string) ([]models.Holding, error) {
+			return []models.Holding{
+				{Symbol: "AAA", AssetType: "stock", Quantity: 10, AvgPrice: 100},
+			}, nil
+		},
+	}
+	prices := stubUnitPrices{fn: func(symbol string, avg float64) float64 {
+		if symbol == "AAA" {
+			return 110
+		}
+		return avg
+	}}
+	svc := &PortfolioService{PortfolioRepo: repo, HoldingRepo: holdings, Prices: prices}
+
+	s, err := svc.GetPortfolioSummary("u1", "p1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if s.TotalInvested != 1000 || s.TotalPortfolioValue != 1100 {
+		t.Fatalf("unexpected totals: invested=%f value=%f", s.TotalInvested, s.TotalPortfolioValue)
+	}
+	if s.TotalProfitLoss != 100 || s.ProfitLossPercentage != 10 {
+		t.Fatalf("unexpected P/L: %+v", s)
+	}
+	if len(s.AssetAllocation) != 1 || s.AssetAllocation[0].Value != 1100 {
+		t.Fatalf("unexpected allocation: %#v", s.AssetAllocation)
+	}
+}
+
+func TestPortfolioService_GetPortfolioSummary_NoHoldingRepo(t *testing.T) {
+	repo := &fakePortfolioRepository{
+		getByIDFn: func(id string) (*models.Portfolio, error) {
+			return &models.Portfolio{ID: id, UserID: "u1"}, nil
+		},
+	}
+	svc := &PortfolioService{PortfolioRepo: repo, HoldingRepo: nil}
+
+	_, err := svc.GetPortfolioSummary("u1", "p1")
+	if err == nil || err.Error() != "holding repository not configured" {
+		t.Fatalf("expected config error, got %v", err)
+	}
+}

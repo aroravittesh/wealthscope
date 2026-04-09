@@ -56,9 +56,13 @@ CREATE TABLE assets (
 CREATE TABLE holdings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     portfolio_id UUID NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
-    asset_id UUID NOT NULL REFERENCES assets(id),
+    symbol TEXT NOT NULL,
+    asset_type TEXT CHECK (asset_type IN ('STOCK', 'CRYPTO', 'ETF')) NOT NULL,
     quantity NUMERIC NOT NULL CHECK (quantity >= 0),
-    UNIQUE (portfolio_id, asset_id)
+    avg_price NUMERIC NOT NULL CHECK (avg_price >= 0),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (portfolio_id, symbol)
 );
 
 -- =========================

@@ -10,6 +10,7 @@ import (
 
 	"wealthscope-backend/internal/db"
 	"wealthscope-backend/internal/handlers"
+	"wealthscope-backend/internal/market"
 	"wealthscope-backend/internal/middleware"
 	"wealthscope-backend/internal/repository"
 	"wealthscope-backend/internal/services"
@@ -26,14 +27,20 @@ func main() {
 	// repositories
 	userRepo := repository.NewUserRepository(database)
 	portfolioRepo := repository.NewPortfolioRepository(database)
+	holdingRepo := repository.NewHoldingRepository(database)
+
 	portfolioService := &services.PortfolioService{
 		PortfolioRepo: portfolioRepo,
+		HoldingRepo:   holdingRepo,
+		Prices:        market.NewDefaultProvider(),
 	}
 	portfolioHandler := handlers.NewPortfolioHandler(portfolioService)
 
 	// ✅ holdings
-	holdingRepo := repository.NewHoldingRepository(database)
-	holdingService := &services.HoldingService{Repo: holdingRepo}
+	holdingService := &services.HoldingService{
+		Repo:          holdingRepo,
+		PortfolioRepo: portfolioRepo,
+	}
 	holdingHandler := &handlers.HoldingHandler{Service: holdingService}
 
 	refreshTokenRepo := repository.NewRefreshTokenRepository(database)
@@ -103,6 +110,11 @@ func main() {
 		middleware.AuthMiddleware(http.HandlerFunc(portfolioHandler.Delete)),
 	).Methods("DELETE")
 
+	api.Handle(
+		"/portfolios/{id}/summary",
+		middleware.AuthMiddleware(http.HandlerFunc(portfolioHandler.GetSummary)),
+	).Methods("GET")
+
 	// ✅ holdings routes
 	api.Handle(
 		"/holdings",
@@ -118,6 +130,11 @@ func main() {
 		"/holdings/{id}",
 		middleware.AuthMiddleware(http.HandlerFunc(holdingHandler.Delete)),
 	).Methods("DELETE")
+
+	api.Handle(
+		"/holdings/{id}",
+		middleware.AuthMiddleware(http.HandlerFunc(holdingHandler.Update)),
+	).Methods("PUT")
 
 	// CORS middleware
 	withCORS := func(h http.Handler) http.Handler {

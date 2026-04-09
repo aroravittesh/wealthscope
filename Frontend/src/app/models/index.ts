@@ -1,29 +1,24 @@
 export interface User {
-  id: string;
+  id?: string;
   email: string;
-  fullName: string;
-  role: 'USER' | 'ADMIN';
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface AuthResponse {
-  user: User;
-  token: string;
-  refreshToken: string;
+  fullName?: string;
+  role?: 'USER' | 'ADMIN';
+  riskPreference?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface Portfolio {
   id: string;
-  userId: string;
+  userId?: string;
   name: string;
-  description: string;
-  totalValue: number;
-  totalInvested: number;
-  totalProfitLoss: number;
-  profitLossPercentage: number;
-  createdAt: Date;
-  updatedAt: Date;
+  description?: string;
+  totalValue?: number;
+  totalInvested?: number;
+  totalProfitLoss?: number;
+  profitLossPercentage?: number;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface Holding {
@@ -70,6 +65,28 @@ export interface DashboardMetrics {
   portfoliosCount: number;
   topPerformers: Asset[];
   allocationData: { [key: string]: number };
+}
+
+/** Backend GET /portfolios/:id/summary (analytics engine). */
+export interface AssetAllocationRow {
+  symbol: string;
+  assetType: string;
+  costBasis: number;
+  currentPrice: number;
+  value: number;
+  percent: number;
+}
+
+export interface PortfolioSummary {
+  portfolioId: string;
+  portfolioName: string;
+  totalInvested: number;
+  totalPortfolioValue: number;
+  totalProfitLoss: number;
+  profitLossPercentage: number;
+  diversificationScore: number;
+  volatilityScore: number;
+  assetAllocation: AssetAllocationRow[];
 }
 
 export interface ChartData {

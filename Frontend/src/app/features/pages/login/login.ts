@@ -127,7 +127,7 @@ export class LoginComponent {
         this.router.navigate(['/dashboard']);
       },
       error: (err) => {
-        alert(err.error?.message || 'Login failed');
+        alert(err?.error?.message || err?.error || 'Login failed');
       }
     });
   }

@@ -76,7 +76,7 @@ export class SignupComponent {
         },
         error: (err) => {
           this.isSubmitting = false;
-          this.errorMessage = err?.error?.message || 'Registration failed. Please try again.';
+          this.errorMessage = err?.error?.message || err?.error || 'Registration failed. Please try again.';
         }
       });
   }
