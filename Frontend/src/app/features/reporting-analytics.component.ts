@@ -4,7 +4,7 @@ import { RouterModule } from '@angular/router';
 import { forkJoin, of, Subject } from 'rxjs';
 import { catchError, map, takeUntil } from 'rxjs/operators';
 import { PortfolioService } from '../services/portfolio.service';
-import { Holding, Portfolio } from '../models';
+import { Holding, Portfolio, PortfolioSummary } from '../models';
 
 @Component({
   selector: 'app-reporting-analytics',
@@ -15,7 +15,7 @@ import { Holding, Portfolio } from '../models';
       <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <div>
           <h1 class="text-3xl font-bold text-white">Analytics</h1>
-          <p class="text-slate-400 mt-1">Live summary from your current portfolio holdings.</p>
+          <p class="text-slate-400 mt-1">Totals and allocation from the analytics API (mark-to-estimate pricing).</p>
         </div>
         <div class="flex gap-2">
           <button
@@ -51,6 +51,10 @@ import { Holding, Portfolio } from '../models';
         {{ errorMessage }}
       </div>
 
+      <div *ngIf="!loading && !errorMessage && warningMessage" class="bg-amber-900/20 border border-amber-500/40 rounded-xl p-4 text-amber-100 mb-6">
+        {{ warningMessage }}
+      </div>
+
       <ng-container *ngIf="!loading && !errorMessage">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div class="bg-slate-800/70 rounded-xl p-6 border border-slate-700">
@@ -78,9 +82,11 @@ import { Holding, Portfolio } from '../models';
             No holdings found. Add holdings to view allocation.
           </div>
           <div *ngFor="let row of allocationRows" class="mb-3">
-            <div class="flex justify-between text-sm mb-1">
+            <div class="flex justify-between text-sm mb-1 gap-2">
               <span class="text-slate-200 font-medium">{{ row.symbol }}</span>
-              <span class="text-slate-300">{{ row.percent.toFixed(2) }}%</span>
+              <span class="text-slate-300 shrink-0 text-right">
+                \${{ row.value.toFixed(2) }} · {{ row.percent.toFixed(2) }}%
+              </span>
             </div>
             <div class="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
               <div class="h-2 bg-gradient-to-r from-blue-500 to-purple-600" [style.width.%]="row.percent"></div>
@@ -112,13 +118,14 @@ import { Holding, Portfolio } from '../models';
 export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
   loading = false;
   errorMessage: string | null = null;
+  warningMessage: string | null = null;
 
   totalValue = 0;
   totalInvested = 0;
   profitLoss = 0;
   profitLossPercent = 0;
 
-  allocationRows: Array<{ symbol: string; percent: number }> = [];
+  allocationRows: Array<{ symbol: string; value: number; percent: number }> = [];
   portfolioRows: Array<{ name: string; value: number; share: number; holdingsCount: number }> = [];
 
   private destroy$ = new Subject<void>();
@@ -132,6 +139,7 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
   private loadAnalytics(): void {
     this.loading = true;
     this.errorMessage = null;
+    this.warningMessage = null;
 
     this.portfolioService.getPortfolios().pipe(takeUntil(this.destroy$)).subscribe({
       next: portfolios => {
@@ -142,16 +150,38 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
         }
 
         const requests = portfolios.map(portfolio =>
-          this.portfolioService.getHoldings(portfolio.id).pipe(
-            map(holdings => ({ portfolio, holdings })),
-            catchError(() => of({ portfolio, holdings: [] as Holding[] }))
+          forkJoin({
+            summary: this.portfolioService.getPortfolioSummary(portfolio.id).pipe(
+              catchError(() => of(null))
+            ),
+            holdings: this.portfolioService.getHoldings(portfolio.id).pipe(
+              catchError(() => of([] as Holding[]))
+            )
+          }).pipe(
+            map(({ summary, holdings }) => ({
+              portfolio,
+              summary,
+              holdings
+            }))
           )
         );
 
         forkJoin(requests).pipe(takeUntil(this.destroy$)).subscribe({
           next: rows => {
-            this.buildAnalytics(rows);
             this.loading = false;
+            const ok = rows.filter(
+              (r): r is { portfolio: Portfolio; summary: PortfolioSummary; holdings: Holding[] } =>
+                r.summary !== null
+            );
+            if (!ok.length) {
+              this.errorMessage = 'Could not load portfolio analytics from the server.';
+              this.resetAnalytics();
+              return;
+            }
+            if (ok.length < rows.length) {
+              this.warningMessage = 'Some portfolios could not be loaded.';
+            }
+            this.buildAnalyticsFromSummaries(ok);
           },
           error: () => {
             this.errorMessage = 'Failed to load analytics';
@@ -166,43 +196,48 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
     });
   }
 
-  private buildAnalytics(rows: Array<{ portfolio: Portfolio; holdings: Holding[] }>): void {
+  private buildAnalyticsFromSummaries(
+    rows: Array<{ portfolio: Portfolio; summary: PortfolioSummary; holdings: Holding[] }>
+  ): void {
     const symbolTotals = new Map<string, number>();
     const portfolioStats: Array<{ name: string; value: number; holdingsCount: number }> = [];
 
-    let total = 0;
+    let totalInvested = 0;
+    let totalMarket = 0;
 
-    rows.forEach(({ portfolio, holdings }) => {
-      const portfolioValue = holdings.reduce((sum, h) => sum + (Number(h.quantity) * Number(h.avgPrice)), 0);
-      total += portfolioValue;
+    for (const { portfolio, summary, holdings } of rows) {
+      totalInvested += summary.totalInvested;
+      totalMarket += summary.totalPortfolioValue;
       portfolioStats.push({
         name: portfolio.name,
-        value: portfolioValue,
+        value: summary.totalPortfolioValue,
         holdingsCount: holdings.length
       });
 
-      holdings.forEach(h => {
-        const value = Number(h.quantity) * Number(h.avgPrice);
-        symbolTotals.set(h.symbol, (symbolTotals.get(h.symbol) ?? 0) + value);
-      });
-    });
+      for (const row of summary.assetAllocation) {
+        const next = (symbolTotals.get(row.symbol) ?? 0) + row.value;
+        symbolTotals.set(row.symbol, next);
+      }
+    }
 
-    this.totalValue = total;
-    this.totalInvested = total;
+    this.totalValue = totalMarket;
+    this.totalInvested = totalInvested;
     this.profitLoss = this.totalValue - this.totalInvested;
-    this.profitLossPercent = this.totalInvested > 0 ? (this.profitLoss / this.totalInvested) * 100 : 0;
+    this.profitLossPercent =
+      this.totalInvested > 0 ? (this.profitLoss / this.totalInvested) * 100 : 0;
 
     this.allocationRows = Array.from(symbolTotals.entries())
       .map(([symbol, value]) => ({
         symbol,
-        percent: total > 0 ? (value / total) * 100 : 0
+        value,
+        percent: this.totalValue > 0 ? (value / this.totalValue) * 100 : 0
       }))
       .sort((a, b) => b.percent - a.percent);
 
     this.portfolioRows = portfolioStats
       .map(p => ({
         ...p,
-        share: total > 0 ? (p.value / total) * 100 : 0
+        share: this.totalValue > 0 ? (p.value / this.totalValue) * 100 : 0
       }))
       .sort((a, b) => b.value - a.value);
   }
@@ -214,6 +249,7 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
     this.profitLossPercent = 0;
     this.allocationRows = [];
     this.portfolioRows = [];
+    this.warningMessage = null;
   }
 
   ngOnDestroy(): void {
@@ -229,9 +265,9 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
     rows.push(`Summary,Profit/Loss,${this.profitLoss.toFixed(2)}`);
     rows.push(`Summary,Profit/Loss %,${this.profitLossPercent.toFixed(2)}%`);
     rows.push('');
-    rows.push('Allocation,Symbol,Percent');
+    rows.push('Allocation,Symbol,Market Value,Percent');
     this.allocationRows.forEach(row => {
-      rows.push(`Allocation,${row.symbol},${row.percent.toFixed(2)}%`);
+      rows.push(`Allocation,${row.symbol},${row.value.toFixed(2)},${row.percent.toFixed(2)}%`);
     });
     rows.push('');
     rows.push('Portfolio Breakdown,Name,Value,Share,Holdings Count');
@@ -261,7 +297,9 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
     if (!this.allocationRows.length) {
       lines.push('- No holdings found');
     } else {
-      this.allocationRows.forEach(r => lines.push(`- ${r.symbol}: ${r.percent.toFixed(2)}%`));
+      this.allocationRows.forEach(r =>
+        lines.push(`- ${r.symbol}: $${r.value.toFixed(2)} (${r.percent.toFixed(2)}%)`)
+      );
     }
     lines.push('');
     lines.push('Portfolio Breakdown:');
