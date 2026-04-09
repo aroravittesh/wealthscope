@@ -9,21 +9,21 @@ import (
 )
 
 type fakePortfolioRepository struct {
-	createFn        func(p *models.Portfolio) error
-	getByUserFn     func(userID string) ([]models.Portfolio, error)
-	getByIDFn       func(id string) (*models.Portfolio, error)
-	updateNameFn    func(id string, name string) error
-	deleteFn        func(id string) error
+	createFn     func(p *models.Portfolio) error
+	getByUserFn  func(userID string) ([]models.Portfolio, error)
+	getByIDFn    func(id string) (*models.Portfolio, error)
+	updateNameFn func(id string, name string) error
+	deleteFn     func(id string) error
 
-	createCalls     int
-	lastCreated     *models.Portfolio
+	createCalls int
+	lastCreated *models.Portfolio
 
 	updateNameCalls int
-	lastUpdatedID    string
-	lastUpdatedName  string
+	lastUpdatedID   string
+	lastUpdatedName string
 
-	deleteCalls    int
-	lastDeletedID  string
+	deleteCalls   int
+	lastDeletedID string
 }
 
 func (f *fakePortfolioRepository) Create(portfolio *models.Portfolio) error {
@@ -184,3 +184,65 @@ func TestPortfolioService_Delete_Success(t *testing.T) {
 	}
 }
 
+func TestPortfolioService_GetPortfolioSummary_Unauthorized(t *testing.T) {
+	repo := &fakePortfolioRepository{
+		getByIDFn: func(id string) (*models.Portfolio, error) {
+			return &models.Portfolio{ID: id, UserID: "other", Name: "X"}, nil
+		},
+	}
+	holdings := &fakeHoldingRepository{}
+	svc := &PortfolioService{PortfolioRepo: repo, HoldingRepo: holdings}
+
+	_, err := svc.GetPortfolioSummary("u1", "p1")
+	if err == nil || err.Error() != "unauthorized" {
+		t.Fatalf("expected unauthorized, got %v", err)
+	}
+}
+
+func TestPortfolioService_GetPortfolioSummary_SuccessAndAllocation(t *testing.T) {
+	repo := &fakePortfolioRepository{
+		getByIDFn: func(id string) (*models.Portfolio, error) {
+			return &models.Portfolio{ID: id, UserID: "u1", Name: "Main"}, nil
+		},
+	}
+	holdings := &fakeHoldingRepository{
+		getByPortfolioFn: func(portfolioID string) ([]models.Holding, error) {
+			return []models.Holding{
+				{Symbol: "AAA", AssetType: "stock", Quantity: 10, AvgPrice: 100},
+				{Symbol: "BBB", AssetType: "etf", Quantity: 5, AvgPrice: 200},
+			}, nil
+		},
+	}
+	svc := &PortfolioService{PortfolioRepo: repo, HoldingRepo: holdings}
+
+	s, err := svc.GetPortfolioSummary("u1", "p1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if s.PortfolioName != "Main" || s.TotalInvested != 2000 || s.TotalPortfolioValue != 2000 {
+		t.Fatalf("unexpected totals: %#v", s)
+	}
+	if s.TotalProfitLoss != 0 || s.ProfitLossPercentage != 0 {
+		t.Fatalf("slice 1 should have zero P/L, got %#v", s)
+	}
+	if len(s.AssetAllocation) != 2 {
+		t.Fatalf("expected 2 allocation rows, got %d", len(s.AssetAllocation))
+	}
+	if s.AssetAllocation[0].Percent != 50 || s.AssetAllocation[1].Percent != 50 {
+		t.Fatalf("expected 50/50 allocation, got %#v", s.AssetAllocation)
+	}
+}
+
+func TestPortfolioService_GetPortfolioSummary_NoHoldingRepo(t *testing.T) {
+	repo := &fakePortfolioRepository{
+		getByIDFn: func(id string) (*models.Portfolio, error) {
+			return &models.Portfolio{ID: id, UserID: "u1"}, nil
+		},
+	}
+	svc := &PortfolioService{PortfolioRepo: repo, HoldingRepo: nil}
+
+	_, err := svc.GetPortfolioSummary("u1", "p1")
+	if err == nil || err.Error() != "holding repository not configured" {
+		t.Fatalf("expected config error, got %v", err)
+	}
+}

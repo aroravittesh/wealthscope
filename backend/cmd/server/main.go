@@ -26,13 +26,15 @@ func main() {
 	// repositories
 	userRepo := repository.NewUserRepository(database)
 	portfolioRepo := repository.NewPortfolioRepository(database)
+	holdingRepo := repository.NewHoldingRepository(database)
+
 	portfolioService := &services.PortfolioService{
 		PortfolioRepo: portfolioRepo,
+		HoldingRepo:   holdingRepo,
 	}
 	portfolioHandler := handlers.NewPortfolioHandler(portfolioService)
 
 	// ✅ holdings
-	holdingRepo := repository.NewHoldingRepository(database)
 	holdingService := &services.HoldingService{
 		Repo:          holdingRepo,
 		PortfolioRepo: portfolioRepo,
@@ -105,6 +107,11 @@ func main() {
 		"/portfolios/{id}",
 		middleware.AuthMiddleware(http.HandlerFunc(portfolioHandler.Delete)),
 	).Methods("DELETE")
+
+	api.Handle(
+		"/portfolios/{id}/summary",
+		middleware.AuthMiddleware(http.HandlerFunc(portfolioHandler.GetSummary)),
+	).Methods("GET")
 
 	// ✅ holdings routes
 	api.Handle(

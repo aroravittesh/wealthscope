@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -82,4 +84,27 @@ func (h *PortfolioHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+// GetSummary returns holdings-based totals and allocation (see portfolio analytics slice 1).
+func (h *PortfolioHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(string)
+	id := mux.Vars(r)["id"]
+
+	summary, err := h.Service.GetPortfolioSummary(userID, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "portfolio not found", http.StatusNotFound)
+			return
+		}
+		if err.Error() == "unauthorized" {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(summary)
 }
