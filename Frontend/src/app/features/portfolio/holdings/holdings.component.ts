@@ -27,6 +27,7 @@ export class HoldingsComponent implements OnInit, OnDestroy {
   isEditing = false;
   mutating = false;
   formErrorMessage: string | null = null;
+  selectedHoldingId: string | null = null;
 
   holdingForm: {
     symbol: string;
@@ -119,6 +120,7 @@ export class HoldingsComponent implements OnInit, OnDestroy {
     this.isEditing = false;
     this.mutating = false;
     this.formErrorMessage = null;
+    this.selectedHoldingId = null;
     this.holdingForm = { symbol: '', assetType: 'STOCK', quantity: null, avgPrice: null };
     this.showHoldingModal = true;
   }
@@ -133,6 +135,7 @@ export class HoldingsComponent implements OnInit, OnDestroy {
       quantity: holding.quantity,
       avgPrice: holding.avgPrice
     };
+    this.selectedHoldingId = holding.id;
     this.showHoldingModal = true;
   }
 
@@ -186,28 +189,33 @@ export class HoldingsComponent implements OnInit, OnDestroy {
     this.mutating = true;
     this.formErrorMessage = null;
 
-    this.portfolioService
-      .addOrUpdateHolding({
-        portfolio_id: this.portfolioId,
-        symbol: normalized.symbol,
-        asset_type: normalized.assetType,
-        quantity: normalized.quantity,
-        avg_price: normalized.avgPrice
-      })
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: () => {
-          this.mutating = false;
-          this.showHoldingModal = false;
-          this.loadHoldings(this.portfolioId as string);
-        },
-        error: (err: any) => {
-          this.mutating = false;
-          const backendMessage =
-            err?.error?.message ?? err?.error ?? err?.message ?? 'Failed to save holding';
-          this.formErrorMessage = typeof backendMessage === 'string' ? backendMessage : 'Failed to save holding';
-        }
-      });
+    const request$ = this.isEditing && this.selectedHoldingId
+      ? this.portfolioService.updateHolding(this.selectedHoldingId, {
+          quantity: normalized.quantity,
+          avg_price: normalized.avgPrice
+        })
+      : this.portfolioService.addHolding({
+          portfolio_id: this.portfolioId,
+          symbol: normalized.symbol,
+          asset_type: normalized.assetType,
+          quantity: normalized.quantity,
+          avg_price: normalized.avgPrice
+        });
+
+    request$.pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        this.mutating = false;
+        this.showHoldingModal = false;
+        this.selectedHoldingId = null;
+        this.loadHoldings(this.portfolioId as string);
+      },
+      error: (err: any) => {
+        this.mutating = false;
+        const backendMessage =
+          err?.error?.message ?? err?.error ?? err?.message ?? 'Failed to save holding';
+        this.formErrorMessage = typeof backendMessage === 'string' ? backendMessage : 'Failed to save holding';
+      }
+    });
   }
 
   deleteHolding(holding: Holding): void {

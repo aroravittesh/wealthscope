@@ -14,6 +14,8 @@ type HoldingRepository interface {
 	GetByPortfolio(portfolioID string) ([]models.Holding, error)
 	Delete(id string) error
 	FindBySymbol(portfolioID, symbol string) (*models.Holding, error)
+	GetByID(id string) (*models.Holding, error)
+	UpdateByID(id string, quantity float64, avgPrice float64) error
 }
 
 type HoldingRepositoryPG struct {
@@ -108,5 +110,32 @@ func (r *HoldingRepositoryPG) GetByPortfolio(portfolioID string) ([]models.Holdi
 
 func (r *HoldingRepositoryPG) Delete(id string) error {
 	_, err := r.DB.Exec("DELETE FROM holdings WHERE id=$1", id)
+	return err
+}
+
+func (r *HoldingRepositoryPG) GetByID(id string) (*models.Holding, error) {
+	row := r.DB.QueryRow(`
+		SELECT id, portfolio_id, symbol, asset_type, quantity, avg_price, created_at, updated_at
+		FROM holdings
+		WHERE id=$1
+	`, id)
+
+	var h models.Holding
+	err := row.Scan(
+		&h.ID, &h.PortfolioID, &h.Symbol, &h.AssetType,
+		&h.Quantity, &h.AvgPrice, &h.CreatedAt, &h.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &h, nil
+}
+
+func (r *HoldingRepositoryPG) UpdateByID(id string, quantity float64, avgPrice float64) error {
+	_, err := r.DB.Exec(`
+		UPDATE holdings
+		SET quantity=$1, avg_price=$2, updated_at=$3
+		WHERE id=$4
+	`, quantity, avgPrice, time.Now(), id)
 	return err
 }
