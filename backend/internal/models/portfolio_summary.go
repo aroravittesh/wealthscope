@@ -1,7 +1,7 @@
 package models
 
 // PortfolioSummary is holdings-based analytics for a portfolio.
-// Slice 1: market value and P/L match cost basis until live pricing (slice 2).
+// Total portfolio value and per-row values use mark-to-estimate unit prices (Slice 2).
 type PortfolioSummary struct {
 	PortfolioID          string               `json:"portfolio_id"`
 	PortfolioName        string               `json:"portfolio_name"`
@@ -12,9 +12,12 @@ type PortfolioSummary struct {
 	AssetAllocation      []AssetAllocationRow `json:"asset_allocation"`
 }
 
+// AssetAllocationRow: Value and Percent use market value (qty × current unit price).
 type AssetAllocationRow struct {
-	Symbol    string  `json:"symbol"`
-	AssetType string  `json:"asset_type"`
-	Value     float64 `json:"value"`
-	Percent   float64 `json:"percent"`
+	Symbol       string  `json:"symbol"`
+	AssetType    string  `json:"asset_type"`
+	CostBasis    float64 `json:"cost_basis"`
+	CurrentPrice float64 `json:"current_price"`
+	Value        float64 `json:"value"`
+	Percent      float64 `json:"percent"`
 }

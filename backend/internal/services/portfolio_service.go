@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 
+	"wealthscope-backend/internal/market"
 	"wealthscope-backend/internal/models"
 	"wealthscope-backend/internal/repository"
 )
@@ -11,6 +12,7 @@ import (
 type PortfolioService struct {
 	PortfolioRepo repository.PortfolioRepository
 	HoldingRepo   repository.HoldingRepository
+	Prices        market.PriceProvider
 }
 
 func (s *PortfolioService) Create(userID string, name string) (*models.Portfolio, error) {
@@ -62,7 +64,7 @@ func (s *PortfolioService) Delete(userID, portfolioID string) error {
 }
 
 // GetPortfolioSummary aggregates holdings for analytics. Requires HoldingRepo.
-// Slice 1: total_portfolio_value equals cost basis (quantity × avg_price); P/L is zero.
+// Totals use mark-to-estimate prices from Prices (defaults to cost basis if Prices is nil).
 func (s *PortfolioService) GetPortfolioSummary(userID, portfolioID string) (*models.PortfolioSummary, error) {
 	if s.HoldingRepo == nil {
 		return nil, errors.New("holding repository not configured")
@@ -81,32 +83,63 @@ func (s *PortfolioService) GetPortfolioSummary(userID, portfolioID string) (*mod
 		return nil, err
 	}
 
-	var total float64
-	rows := make([]models.AssetAllocationRow, 0, len(holdings))
+	prices := s.Prices
+	if prices == nil {
+		prices = market.Passthrough{}
+	}
+
+	var totalInvested float64
+	type rowAgg struct {
+		row models.AssetAllocationRow
+	}
+	aggs := make([]rowAgg, 0, len(holdings))
+
 	for _, h := range holdings {
-		v := h.Quantity * h.AvgPrice
-		total += v
-		rows = append(rows, models.AssetAllocationRow{
-			Symbol:    h.Symbol,
-			AssetType: h.AssetType,
-			Value:     v,
-			Percent:   0,
+		cost := h.Quantity * h.AvgPrice
+		totalInvested += cost
+		unit := prices.UnitPrice(h.Symbol, h.AvgPrice)
+		mkt := h.Quantity * unit
+		aggs = append(aggs, rowAgg{
+			row: models.AssetAllocationRow{
+				Symbol:       h.Symbol,
+				AssetType:    h.AssetType,
+				CostBasis:    cost,
+				CurrentPrice: unit,
+				Value:        mkt,
+				Percent:      0,
+			},
 		})
 	}
 
-	if total > 0 {
-		for i := range rows {
-			rows[i].Percent = math.Round((rows[i].Value/total)*10000) / 100
+	var totalMkt float64
+	for _, a := range aggs {
+		totalMkt += a.row.Value
+	}
+
+	if totalMkt > 0 {
+		for i := range aggs {
+			aggs[i].row.Percent = math.Round((aggs[i].row.Value/totalMkt)*10000) / 100
 		}
+	}
+
+	rows := make([]models.AssetAllocationRow, len(aggs))
+	for i := range aggs {
+		rows[i] = aggs[i].row
+	}
+
+	pnl := totalMkt - totalInvested
+	var pnlPct float64
+	if totalInvested > 0 {
+		pnlPct = math.Round((pnl/totalInvested)*10000) / 100
 	}
 
 	return &models.PortfolioSummary{
 		PortfolioID:          p.ID,
 		PortfolioName:        p.Name,
-		TotalInvested:        total,
-		TotalPortfolioValue:  total,
-		TotalProfitLoss:      0,
-		ProfitLossPercentage: 0,
+		TotalInvested:        totalInvested,
+		TotalPortfolioValue:  totalMkt,
+		TotalProfitLoss:      pnl,
+		ProfitLossPercentage: pnlPct,
 		AssetAllocation:      rows,
 	}, nil
 }
