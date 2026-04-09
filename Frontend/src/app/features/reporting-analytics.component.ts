@@ -40,10 +40,18 @@ import { Holding, Portfolio, PortfolioSummary } from '../models';
         </div>
       </div>
 
-      <div *ngIf="loading" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div *ngFor="let i of [1,2,3]" class="bg-slate-800/70 rounded-xl p-6 border border-slate-700 animate-pulse">
-          <div class="h-4 w-32 bg-slate-700 rounded mb-3"></div>
-          <div class="h-8 w-24 bg-slate-700 rounded"></div>
+      <div *ngIf="loading" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div *ngFor="let i of [1,2,3]" class="bg-slate-800/70 rounded-xl p-6 border border-slate-700 animate-pulse">
+            <div class="h-4 w-32 bg-slate-700 rounded mb-3"></div>
+            <div class="h-8 w-24 bg-slate-700 rounded"></div>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div *ngFor="let j of [1,2]" class="bg-slate-800/70 rounded-xl p-6 border border-slate-700 animate-pulse">
+            <div class="h-4 w-40 bg-slate-700 rounded mb-3"></div>
+            <div class="h-3 w-full bg-slate-700 rounded"></div>
+          </div>
         </div>
       </div>
 
@@ -76,6 +84,31 @@ import { Holding, Portfolio, PortfolioSummary } from '../models';
           </div>
         </div>
 
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          <div class="bg-slate-800/70 rounded-xl p-6 border border-slate-700">
+            <p class="text-slate-400 text-sm">Diversification score</p>
+            <p class="text-cyan-300 text-3xl font-bold mt-2">{{ diversificationScoreAgg.toFixed(1) }}</p>
+            <p class="text-slate-500 text-xs mt-1">0–100 · higher = more balanced across holdings (value-weighted across portfolios)</p>
+            <div class="w-full h-2 bg-slate-700 rounded-full overflow-hidden mt-3">
+              <div
+                class="h-2 bg-gradient-to-r from-cyan-600 to-teal-400 transition-all"
+                [style.width.%]="diversificationScoreAgg"
+              ></div>
+            </div>
+          </div>
+          <div class="bg-slate-800/70 rounded-xl p-6 border border-slate-700">
+            <p class="text-slate-400 text-sm">Volatility score</p>
+            <p class="text-amber-300 text-3xl font-bold mt-2">{{ volatilityScoreAgg.toFixed(1) }}</p>
+            <p class="text-slate-500 text-xs mt-1">0–100 · higher = more volatile (value-weighted across portfolios)</p>
+            <div class="w-full h-2 bg-slate-700 rounded-full overflow-hidden mt-3">
+              <div
+                class="h-2 bg-gradient-to-r from-amber-700 to-orange-400 transition-all"
+                [style.width.%]="volatilityScoreAgg"
+              ></div>
+            </div>
+          </div>
+        </div>
+
         <div class="bg-slate-800/70 rounded-xl p-6 border border-slate-700 mb-6">
           <h2 class="text-xl font-semibold text-white mb-4">Asset Allocation</h2>
           <div *ngIf="allocationRows.length === 0" class="text-slate-400 text-sm">
@@ -84,8 +117,8 @@ import { Holding, Portfolio, PortfolioSummary } from '../models';
           <div *ngFor="let row of allocationRows" class="mb-3">
             <div class="flex justify-between text-sm mb-1 gap-2">
               <span class="text-slate-200 font-medium">{{ row.symbol }}</span>
-              <span class="text-slate-300 shrink-0 text-right">
-                \${{ row.value.toFixed(2) }} · {{ row.percent.toFixed(2) }}%
+              <span class="text-slate-300 shrink-0 text-right text-xs sm:text-sm">
+                \${{ row.costBasis.toFixed(0) }} → \${{ row.value.toFixed(2) }} · {{ row.percent.toFixed(2) }}%
               </span>
             </div>
             <div class="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
@@ -99,12 +132,15 @@ import { Holding, Portfolio, PortfolioSummary } from '../models';
           <div *ngIf="portfolioRows.length === 0" class="text-slate-400 text-sm">
             No portfolios found.
           </div>
-          <div *ngFor="let row of portfolioRows" class="flex items-center justify-between py-3 border-b border-slate-700 last:border-0">
+          <div *ngFor="let row of portfolioRows" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-3 border-b border-slate-700 last:border-0">
             <div>
               <p class="text-white font-semibold">{{ row.name }}</p>
-              <p class="text-slate-400 text-xs">{{ row.holdingsCount }} holdings</p>
+              <p class="text-slate-400 text-xs">
+                {{ row.holdingsCount }} holdings · Diversification {{ row.diversificationScore.toFixed(1) }} · Volatility
+                {{ row.volatilityScore.toFixed(1) }}
+              </p>
             </div>
-            <div class="text-right">
+            <div class="text-left sm:text-right">
               <p class="text-white font-semibold">\${{ row.value.toFixed(2) }}</p>
               <p class="text-xs text-slate-400">{{ row.share.toFixed(2) }}% of total</p>
             </div>
@@ -125,8 +161,19 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
   profitLoss = 0;
   profitLossPercent = 0;
 
-  allocationRows: Array<{ symbol: string; value: number; percent: number }> = [];
-  portfolioRows: Array<{ name: string; value: number; share: number; holdingsCount: number }> = [];
+  /** Value-weighted average across loaded portfolios (API scores are per-portfolio). */
+  diversificationScoreAgg = 0;
+  volatilityScoreAgg = 0;
+
+  allocationRows: Array<{ symbol: string; value: number; costBasis: number; percent: number }> = [];
+  portfolioRows: Array<{
+    name: string;
+    value: number;
+    share: number;
+    holdingsCount: number;
+    diversificationScore: number;
+    volatilityScore: number;
+  }> = [];
 
   private destroy$ = new Subject<void>();
 
@@ -199,24 +246,39 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
   private buildAnalyticsFromSummaries(
     rows: Array<{ portfolio: Portfolio; summary: PortfolioSummary; holdings: Holding[] }>
   ): void {
-    const symbolTotals = new Map<string, number>();
-    const portfolioStats: Array<{ name: string; value: number; holdingsCount: number }> = [];
+    const symbolTotals = new Map<string, { value: number; cost: number }>();
+    const portfolioStats: Array<{
+      name: string;
+      value: number;
+      holdingsCount: number;
+      diversificationScore: number;
+      volatilityScore: number;
+    }> = [];
 
     let totalInvested = 0;
     let totalMarket = 0;
+    let weightedDiv = 0;
+    let weightedVol = 0;
 
     for (const { portfolio, summary, holdings } of rows) {
       totalInvested += summary.totalInvested;
-      totalMarket += summary.totalPortfolioValue;
+      const mkt = summary.totalPortfolioValue;
+      totalMarket += mkt;
+      weightedDiv += summary.diversificationScore * mkt;
+      weightedVol += summary.volatilityScore * mkt;
       portfolioStats.push({
         name: portfolio.name,
-        value: summary.totalPortfolioValue,
-        holdingsCount: holdings.length
+        value: mkt,
+        holdingsCount: holdings.length,
+        diversificationScore: summary.diversificationScore,
+        volatilityScore: summary.volatilityScore
       });
 
       for (const row of summary.assetAllocation) {
-        const next = (symbolTotals.get(row.symbol) ?? 0) + row.value;
-        symbolTotals.set(row.symbol, next);
+        const cur = symbolTotals.get(row.symbol) ?? { value: 0, cost: 0 };
+        cur.value += row.value;
+        cur.cost += row.costBasis;
+        symbolTotals.set(row.symbol, cur);
       }
     }
 
@@ -226,10 +288,14 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
     this.profitLossPercent =
       this.totalInvested > 0 ? (this.profitLoss / this.totalInvested) * 100 : 0;
 
+    this.diversificationScoreAgg = totalMarket > 0 ? weightedDiv / totalMarket : 0;
+    this.volatilityScoreAgg = totalMarket > 0 ? weightedVol / totalMarket : 0;
+
     this.allocationRows = Array.from(symbolTotals.entries())
-      .map(([symbol, value]) => ({
+      .map(([symbol, { value, cost }]) => ({
         symbol,
         value,
+        costBasis: cost,
         percent: this.totalValue > 0 ? (value / this.totalValue) * 100 : 0
       }))
       .sort((a, b) => b.percent - a.percent);
@@ -247,6 +313,8 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
     this.totalInvested = 0;
     this.profitLoss = 0;
     this.profitLossPercent = 0;
+    this.diversificationScoreAgg = 0;
+    this.volatilityScoreAgg = 0;
     this.allocationRows = [];
     this.portfolioRows = [];
     this.warningMessage = null;
@@ -264,15 +332,21 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
     rows.push(`Summary,Total Invested,${this.totalInvested.toFixed(2)}`);
     rows.push(`Summary,Profit/Loss,${this.profitLoss.toFixed(2)}`);
     rows.push(`Summary,Profit/Loss %,${this.profitLossPercent.toFixed(2)}%`);
+    rows.push(`Summary,Diversification score (aggregate),${this.diversificationScoreAgg.toFixed(2)}`);
+    rows.push(`Summary,Volatility score (aggregate),${this.volatilityScoreAgg.toFixed(2)}`);
     rows.push('');
-    rows.push('Allocation,Symbol,Market Value,Percent');
+    rows.push('Allocation,Symbol,Cost Basis,Market Value,Percent');
     this.allocationRows.forEach(row => {
-      rows.push(`Allocation,${row.symbol},${row.value.toFixed(2)},${row.percent.toFixed(2)}%`);
+      rows.push(
+        `Allocation,${row.symbol},${row.costBasis.toFixed(2)},${row.value.toFixed(2)},${row.percent.toFixed(2)}%`
+      );
     });
     rows.push('');
-    rows.push('Portfolio Breakdown,Name,Value,Share,Holdings Count');
+    rows.push('Portfolio Breakdown,Name,Value,Share,Holdings Count,Diversification,Volatility');
     this.portfolioRows.forEach(row => {
-      rows.push(`Portfolio,${row.name},${row.value.toFixed(2)},${row.share.toFixed(2)}%,${row.holdingsCount}`);
+      rows.push(
+        `Portfolio,${row.name},${row.value.toFixed(2)},${row.share.toFixed(2)}%,${row.holdingsCount},${row.diversificationScore.toFixed(2)},${row.volatilityScore.toFixed(2)}`
+      );
     });
 
     const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
@@ -292,13 +366,19 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
     lines.push(`Total Portfolio Value: $${this.totalValue.toFixed(2)}`);
     lines.push(`Total Invested: $${this.totalInvested.toFixed(2)}`);
     lines.push(`Profit/Loss: $${this.profitLoss.toFixed(2)} (${this.profitLossPercent.toFixed(2)}%)`);
+    lines.push(
+      `Diversification score (aggregate): ${this.diversificationScoreAgg.toFixed(1)} / 100`
+    );
+    lines.push(`Volatility score (aggregate): ${this.volatilityScoreAgg.toFixed(1)} / 100`);
     lines.push('');
     lines.push('Asset Allocation:');
     if (!this.allocationRows.length) {
       lines.push('- No holdings found');
     } else {
       this.allocationRows.forEach(r =>
-        lines.push(`- ${r.symbol}: $${r.value.toFixed(2)} (${r.percent.toFixed(2)}%)`)
+        lines.push(
+          `- ${r.symbol}: cost $${r.costBasis.toFixed(2)} → market $${r.value.toFixed(2)} (${r.percent.toFixed(2)}%)`
+        )
       );
     }
     lines.push('');
@@ -307,7 +387,9 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
       lines.push('- No portfolios found');
     } else {
       this.portfolioRows.forEach(r =>
-        lines.push(`- ${r.name}: $${r.value.toFixed(2)} | ${r.share.toFixed(2)}% | ${r.holdingsCount} holdings`)
+        lines.push(
+          `- ${r.name}: $${r.value.toFixed(2)} | ${r.share.toFixed(2)}% | ${r.holdingsCount} holdings | div ${r.diversificationScore.toFixed(1)} | vol ${r.volatilityScore.toFixed(1)}`
+        )
       );
     }
 
