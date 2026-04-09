@@ -9,6 +9,8 @@ type PortfolioSummary struct {
 	TotalPortfolioValue  float64              `json:"total_portfolio_value"`
 	TotalProfitLoss      float64              `json:"total_profit_loss"`
 	ProfitLossPercentage float64              `json:"profit_loss_percentage"`
+	DiversificationScore float64              `json:"diversification_score"`
+	VolatilityScore      float64              `json:"volatility_score"`
 	AssetAllocation      []AssetAllocationRow `json:"asset_allocation"`
 }
 
