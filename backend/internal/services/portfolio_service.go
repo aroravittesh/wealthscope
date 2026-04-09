@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 
+	"wealthscope-backend/internal/analytics"
 	"wealthscope-backend/internal/market"
 	"wealthscope-backend/internal/models"
 	"wealthscope-backend/internal/repository"
@@ -133,6 +134,13 @@ func (s *PortfolioService) GetPortfolioSummary(userID, portfolioID string) (*mod
 		pnlPct = math.Round((pnl/totalInvested)*10000) / 100
 	}
 
+	mktVals := make([]float64, len(rows))
+	typeKeys := make([]string, len(rows))
+	for i := range rows {
+		mktVals[i] = rows[i].Value
+		typeKeys[i] = rows[i].AssetType
+	}
+
 	return &models.PortfolioSummary{
 		PortfolioID:          p.ID,
 		PortfolioName:        p.Name,
@@ -140,6 +148,8 @@ func (s *PortfolioService) GetPortfolioSummary(userID, portfolioID string) (*mod
 		TotalPortfolioValue:  totalMkt,
 		TotalProfitLoss:      pnl,
 		ProfitLossPercentage: pnlPct,
+		DiversificationScore: analytics.DiversificationScore(mktVals),
+		VolatilityScore:      analytics.VolatilityScore(mktVals, typeKeys),
 		AssetAllocation:      rows,
 	}, nil
 }
