@@ -10,6 +10,7 @@ import (
 
 	"wealthscope-backend/internal/db"
 	"wealthscope-backend/internal/handlers"
+	"wealthscope-backend/internal/market"
 	"wealthscope-backend/internal/middleware"
 	"wealthscope-backend/internal/repository"
 	"wealthscope-backend/internal/services"
@@ -31,6 +32,7 @@ func main() {
 	portfolioService := &services.PortfolioService{
 		PortfolioRepo: portfolioRepo,
 		HoldingRepo:   holdingRepo,
+		Prices:        market.NewDefaultProvider(),
 	}
 	portfolioHandler := handlers.NewPortfolioHandler(portfolioService)
 
