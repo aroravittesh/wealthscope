@@ -67,6 +67,28 @@ export interface DashboardMetrics {
   allocationData: { [key: string]: number };
 }
 
+/** Backend GET /portfolios/:id/summary (analytics engine). */
+export interface AssetAllocationRow {
+  symbol: string;
+  assetType: string;
+  costBasis: number;
+  currentPrice: number;
+  value: number;
+  percent: number;
+}
+
+export interface PortfolioSummary {
+  portfolioId: string;
+  portfolioName: string;
+  totalInvested: number;
+  totalPortfolioValue: number;
+  totalProfitLoss: number;
+  profitLossPercentage: number;
+  diversificationScore: number;
+  volatilityScore: number;
+  assetAllocation: AssetAllocationRow[];
+}
+
 export interface ChartData {
   labels: string[];
   datasets: {

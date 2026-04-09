@@ -4,7 +4,13 @@ import { environment } from '../../environments/environment';
 import { BehaviorSubject, Observable, of } from 'rxjs';
 import { map, tap } from 'rxjs/operators';
 
-import { DashboardMetrics, Holding, Portfolio } from '../models';
+import {
+  AssetAllocationRow,
+  DashboardMetrics,
+  Holding,
+  Portfolio,
+  PortfolioSummary
+} from '../models';
 
 @Injectable({
   providedIn: 'root'
@@ -92,6 +98,13 @@ export class PortfolioService {
     );
   }
 
+  /** Portfolio analytics summary (totals, P/L, allocation, diversification & volatility scores). */
+  getPortfolioSummary(portfolioId: string): Observable<PortfolioSummary> {
+    return this.http.get<any>(`${this.portfolioApiUrl}/${portfolioId}/summary`).pipe(
+      map(raw => this.mapPortfolioSummaryFromApi(raw))
+    );
+  }
+
   getHoldings(portfolioId: string): Observable<Holding[]> {
     return this.http
       .get<any[]>(`${this.holdingsApiUrl}/${portfolioId}`)
@@ -139,5 +152,28 @@ export class PortfolioService {
     userId: p.user_id ?? p.userId,
     name: p.name,
     createdAt: p.created_at ? new Date(p.created_at) : p.createdAt
+  });
+
+  private mapPortfolioSummaryFromApi = (s: any): PortfolioSummary => ({
+    portfolioId: s.portfolio_id ?? s.portfolioId,
+    portfolioName: s.portfolio_name ?? s.portfolioName,
+    totalInvested: Number(s.total_invested ?? s.totalInvested ?? 0),
+    totalPortfolioValue: Number(s.total_portfolio_value ?? s.totalPortfolioValue ?? 0),
+    totalProfitLoss: Number(s.total_profit_loss ?? s.totalProfitLoss ?? 0),
+    profitLossPercentage: Number(s.profit_loss_percentage ?? s.profitLossPercentage ?? 0),
+    diversificationScore: Number(s.diversification_score ?? s.diversificationScore ?? 0),
+    volatilityScore: Number(s.volatility_score ?? s.volatilityScore ?? 0),
+    assetAllocation: (s.asset_allocation ?? s.assetAllocation ?? []).map((row: any) =>
+      this.mapAssetAllocationRowFromApi(row)
+    )
+  });
+
+  private mapAssetAllocationRowFromApi = (row: any): AssetAllocationRow => ({
+    symbol: row.symbol,
+    assetType: row.asset_type ?? row.assetType ?? '',
+    costBasis: Number(row.cost_basis ?? row.costBasis ?? 0),
+    currentPrice: Number(row.current_price ?? row.currentPrice ?? 0),
+    value: Number(row.value ?? 0),
+    percent: Number(row.percent ?? 0)
   });
 }
