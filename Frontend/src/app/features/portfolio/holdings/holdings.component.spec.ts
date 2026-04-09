@@ -33,13 +33,14 @@ describe('HoldingsComponent', () => {
 
   const portfolioServiceSpy = jasmine.createSpyObj<PortfolioService>(
     'PortfolioService',
-    ['getPortfolioById', 'getHoldings', 'addOrUpdateHolding', 'deleteHolding']
+    ['getPortfolioById', 'getHoldings', 'addHolding', 'updateHolding', 'deleteHolding']
   );
 
   beforeEach(async () => {
     portfolioServiceSpy.getPortfolioById.and.returnValue(of(portfolioStub));
     portfolioServiceSpy.getHoldings.and.returnValue(of(holdingsStub));
-    portfolioServiceSpy.addOrUpdateHolding.and.returnValue(of({ message: 'holding added/updated' }));
+    portfolioServiceSpy.addHolding.and.returnValue(of({ message: 'holding added' }));
+    portfolioServiceSpy.updateHolding.and.returnValue(of({ message: 'holding updated' }));
     portfolioServiceSpy.deleteHolding.and.returnValue(of({ message: 'holding deleted' }));
 
     await TestBed.configureTestingModule({
@@ -70,7 +71,7 @@ describe('HoldingsComponent', () => {
 
     component.saveHolding();
 
-    expect(portfolioServiceSpy.addOrUpdateHolding).toHaveBeenCalledWith({
+    expect(portfolioServiceSpy.addHolding).toHaveBeenCalledWith({
       portfolio_id: portfolioId,
       symbol: 'AAPL',
       asset_type: 'STOCK',

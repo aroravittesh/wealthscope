@@ -33,7 +33,10 @@ func main() {
 
 	// ✅ holdings
 	holdingRepo := repository.NewHoldingRepository(database)
-	holdingService := &services.HoldingService{Repo: holdingRepo}
+	holdingService := &services.HoldingService{
+		Repo:          holdingRepo,
+		PortfolioRepo: portfolioRepo,
+	}
 	holdingHandler := &handlers.HoldingHandler{Service: holdingService}
 
 	refreshTokenRepo := repository.NewRefreshTokenRepository(database)
@@ -118,6 +121,11 @@ func main() {
 		"/holdings/{id}",
 		middleware.AuthMiddleware(http.HandlerFunc(holdingHandler.Delete)),
 	).Methods("DELETE")
+
+	api.Handle(
+		"/holdings/{id}",
+		middleware.AuthMiddleware(http.HandlerFunc(holdingHandler.Update)),
+	).Methods("PUT")
 
 	// CORS middleware
 	withCORS := func(h http.Handler) http.Handler {

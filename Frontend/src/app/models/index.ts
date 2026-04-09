@@ -1,29 +1,24 @@
 export interface User {
-  id: string;
+  id?: string;
   email: string;
-  fullName: string;
-  role: 'USER' | 'ADMIN';
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface AuthResponse {
-  user: User;
-  token: string;
-  refreshToken: string;
+  fullName?: string;
+  role?: 'USER' | 'ADMIN';
+  riskPreference?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface Portfolio {
   id: string;
-  userId: string;
+  userId?: string;
   name: string;
-  description: string;
-  totalValue: number;
-  totalInvested: number;
-  totalProfitLoss: number;
-  profitLossPercentage: number;
-  createdAt: Date;
-  updatedAt: Date;
+  description?: string;
+  totalValue?: number;
+  totalInvested?: number;
+  totalProfitLoss?: number;
+  profitLossPercentage?: number;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface Holding {
