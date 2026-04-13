@@ -42,6 +42,12 @@ func main() {
 
     router.POST("/predict/risk-drift", handler.RiskDriftHandler)
 
+    router.POST("/portfolio/explain", handler.PortfolioExplainHandler)
+
+    router.POST("/compare", handler.CompareHandler)
+
+    router.GET("/news-sentiment/:symbol", handler.NewsSentimentHandler)
+
     // Risk scoring endpoint
     router.POST("/risk", func(c *gin.Context) {
         var body struct {

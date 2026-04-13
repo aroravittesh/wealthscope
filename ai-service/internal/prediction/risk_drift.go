@@ -36,6 +36,10 @@ type DriftResponse struct {
 	Score       float64 `json:"score"`
 	Explanation string  `json:"explanation"`
 	Disclaimer  string  `json:"disclaimer"`
+	// Metrics shared with portfolio explanation (normalized weights).
+	WeightedBeta float64 `json:"weighted_beta,omitempty"`
+	PositionHHI  float64 `json:"position_hhi,omitempty"`
+	SectorHHI    float64 `json:"sector_hhi,omitempty"`
 }
 
 const disclaimer = "This is a rough estimation for discussion and education only. It is not financial advice and does not predict future performance."
@@ -125,10 +129,13 @@ func PredictRiskDrift(req DriftRequest) (DriftResponse, error) {
 	)
 
 	return DriftResponse{
-		DriftLevel:  string(level),
-		Score:       raw,
-		Explanation: explain,
-		Disclaimer:  disclaimer,
+		DriftLevel:   string(level),
+		Score:        raw,
+		Explanation:  explain,
+		Disclaimer:   disclaimer,
+		WeightedBeta: weightedBeta,
+		PositionHHI:  hhi,
+		SectorHHI:    sectorHHI,
 	}, nil
 }
 
