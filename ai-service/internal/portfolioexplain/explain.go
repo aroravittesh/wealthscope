@@ -32,7 +32,7 @@ func Explain(req Request) (*Response, error) {
 
 	driftReq := prediction.DriftRequest{
 		TargetRisk: req.TargetRisk,
-		Holdings:   toDriftHoldings(req.Holdings),
+		Holdings:   prediction.DriftHoldingsFromML(req.Holdings),
 	}
 	drift, err := prediction.PredictRiskDrift(driftReq)
 	if err != nil {
@@ -67,18 +67,6 @@ func Explain(req Request) (*Response, error) {
 		RiskAlignment:        align,
 		NeutralGuidance:      guidance,
 	}, nil
-}
-
-func toDriftHoldings(h []ml.PortfolioHolding) []prediction.DriftHolding {
-	out := make([]prediction.DriftHolding, len(h))
-	for i, x := range h {
-		out[i] = prediction.DriftHolding{
-			Symbol:     x.Symbol,
-			Allocation: x.Allocation,
-			Beta:       x.Beta,
-		}
-	}
-	return out
 }
 
 func buildTopRisks(wb, hhi, secHHI float64, driftLevel, target string) []string {

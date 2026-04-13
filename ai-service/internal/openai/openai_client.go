@@ -1,154 +1,122 @@
 package openai
 
 import (
-    "bytes"
-    "context"
-    "encoding/json"
-    "errors"
-    "net/http"
-    "os"
-    "sync"
-    "time"
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"os"
+	"time"
 )
 
 type Message struct {
-    Role    string `json:"role"`
-    Content string `json:"content"`
+	Role    string `json:"role"`
+	Content string `json:"content"`
 }
 
 type OpenAIRequest struct {
-    Model    string    `json:"model"`
-    Messages []Message `json:"messages"`
+	Model    string    `json:"model"`
+	Messages []Message `json:"messages"`
 }
 
 type OpenAIResponse struct {
-    Choices []struct {
-        Message Message `json:"message"`
-    } `json:"choices"`
+	Choices []struct {
+		Message Message `json:"message"`
+	} `json:"choices"`
 }
 
-// ConversationStore holds chat history per session
-var (
-    conversationStore = make(map[string][]Message)
-    mu                sync.Mutex
-)
-
 func getSystemPrompt() string {
-    return `You are the AI assistant for WealthScope.
-WealthScope is a stock market education and analysis platform.
-You are ONLY allowed to answer questions related to:
-1. Navigating the WealthScope website (dashboard, stock search, portfolio, news, risk analysis).
-2. General stock market concepts and terminology.
-3. General risk analysis of publicly traded stocks.
+	return `You are the AI assistant for WealthScope, a stock market education and analysis platform.
+
+SCOPE (finance and WealthScope only):
+- Help with navigating WealthScope (dashboard, stock search, portfolio, news, risk tools).
+- Explain general market concepts, terminology, and high-level risk factors for public equities.
+- Refuse unrelated topics (general trivia, politics, sports, coding, entertainment, etc.).
+
 STRICT RULES:
-- If a question is unrelated to stock markets or WealthScope, politely refuse.
-- Do NOT answer general knowledge, entertainment, politics, sports, coding, or random questions.
-- Do NOT analyze user portfolios or personal financial situations.
-- Do NOT provide personalized investment advice, buy/sell recommendations, or price targets.
-- Do NOT predict exact future stock prices.
-- If unsure whether the question is stock-related, refuse.
-- If the user sends a greeting (e.g., "hi", "hello"), respond briefly and professionally,
-  then guide them to ask a stock market or WealthScope-related question.
-- Do NOT engage in casual conversation or small talk.
-When refusing, respond exactly with:
+- Do not provide personalized investment advice, buy/sell/hold recommendations, or price targets.
+- Do not analyze private portfolio situations beyond what neutral context explicitly states.
+- Do not predict exact future prices or guarantee returns.
+- If the user only greets you, reply briefly and invite a finance or WealthScope question.
+- If unsure the question is on-topic, refuse with exactly:
 "I can only assist with stock market and WealthScope-related questions."
-For stock risk analysis:
-- Discuss volatility
-- Industry and sector risks
-- Market and macroeconomic conditions
-- Competitive landscape
-- General company fundamentals (high-level only)
-Keep analysis neutral and informational.
-Always include this disclaimer at the end:
-"Investing in the stock market involves risk. WealthScope does not guarantee the accuracy,
-completeness, or future performance of any information provided and is not responsible
-for any financial outcomes."
-Keep responses clear, structured, and professional.`
+
+GROUNDING:
+- The user message may include a "Grounded context" block with labeled sections such as
+  [Relevant Financial Knowledge], [Live Market Data], [News Context], [Portfolio Context], [System Context].
+- Base factual claims on those sections when they contain data. Do not invent quotes, prices, or headlines.
+- If a section says no data was provided or attached, say clearly that the information is not available in this context (do not guess).
+
+ANSWER FORMAT (when answering a substantive finance question, use this structure):
+1. **Explanation** — Short, direct answer to the question using grounded context where present.
+2. **Key insight or risk note** — One concise bullet or sentence on uncertainty, limits of the data, or a non-personalized risk angle.
+3. **Disclaimer** — End with this exact sentence:
+"Investing in the stock market involves risk. WealthScope does not guarantee the accuracy, completeness, or future performance of any information provided and is not responsible for any financial outcomes."
+
+STYLE:
+- Be concise, neutral, and factual. Prefer plain language over jargon unless the user uses it first.
+- Do not use numbered lists beyond the three-part structure above unless the user asks for a list.`
 }
 
 func CallOpenAI(sessionID string, userInput string) (string, error) {
-    mu.Lock()
+	history := defaultStore.AddUserMessage(sessionID, userInput)
 
-    // Initialize session if new
-    if _, exists := conversationStore[sessionID]; !exists {
-        conversationStore[sessionID] = []Message{}
-    }
+	messages := []Message{
+		{Role: "system", Content: getSystemPrompt()},
+	}
+	messages = append(messages, history...)
 
-    // Append user message to history
-    conversationStore[sessionID] = append(conversationStore[sessionID], Message{
-        Role:    "user",
-        Content: userInput,
-    })
+	reqBody := OpenAIRequest{
+		Model:    "gpt-4o-mini",
+		Messages: messages,
+	}
 
-    // Build messages: system prompt + full history
-    messages := []Message{
-        {Role: "system", Content: getSystemPrompt()},
-    }
-    messages = append(messages, conversationStore[sessionID]...)
-    mu.Unlock()
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", err
+	}
 
-    reqBody := OpenAIRequest{
-        Model:    "gpt-4o-mini",
-        Messages: messages,
-    }
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
 
-    jsonData, err := json.Marshal(reqBody)
-    if err != nil {
-        return "", err
-    }
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		"https://api.openai.com/v1/chat/completions", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", err
+	}
 
-    ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-    defer cancel()
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+os.Getenv("OPENAI_API_KEY"))
 
-    req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-        "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(jsonData))
-    if err != nil {
-        return "", err
-    }
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
 
-    req.Header.Set("Content-Type", "application/json")
-    req.Header.Set("Authorization", "Bearer "+os.Getenv("OPENAI_API_KEY"))
+	if resp.StatusCode != http.StatusOK {
+		return "", errors.New("OpenAI API error: " + resp.Status)
+	}
 
-    client := &http.Client{}
-    resp, err := client.Do(req)
-    if err != nil {
-        return "", err
-    }
-    defer resp.Body.Close()
+	var result OpenAIResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
 
-    if resp.StatusCode != http.StatusOK {
-        return "", errors.New("OpenAI API error: " + resp.Status)
-    }
+	if len(result.Choices) == 0 {
+		return "", errors.New("no response from OpenAI")
+	}
 
-    var result OpenAIResponse
-    if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-        return "", err
-    }
+	reply := result.Choices[0].Message.Content
 
-    if len(result.Choices) == 0 {
-        return "", errors.New("no response from OpenAI")
-    }
+	defaultStore.AddAssistantMessage(sessionID, reply)
 
-    reply := result.Choices[0].Message.Content
-
-    // Save assistant reply to history
-    mu.Lock()
-    conversationStore[sessionID] = append(conversationStore[sessionID], Message{
-        Role:    "assistant",
-        Content: reply,
-    })
-    // Keep last 10 messages to avoid token overflow
-    if len(conversationStore[sessionID]) > 10 {
-        conversationStore[sessionID] = conversationStore[sessionID][len(conversationStore[sessionID])-10:]
-    }
-    mu.Unlock()
-
-    return reply, nil
+	return reply, nil
 }
 
-// ClearSession clears conversation history for a session
+// ClearSession clears conversation history for a session.
 func ClearSession(sessionID string) {
-    mu.Lock()
-    defer mu.Unlock()
-    delete(conversationStore, sessionID)
+	defaultStore.Clear(sessionID)
 }
