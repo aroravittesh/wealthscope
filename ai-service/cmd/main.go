@@ -40,6 +40,8 @@ func main() {
     // Chat endpoint
     router.POST("/chat", handler.ChatHandler)
 
+    router.POST("/predict/risk-drift", handler.RiskDriftHandler)
+
     // Risk scoring endpoint
     router.POST("/risk", func(c *gin.Context) {
         var body struct {
