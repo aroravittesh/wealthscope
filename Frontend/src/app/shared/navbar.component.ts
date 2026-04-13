@@ -24,6 +24,7 @@ import { User } from '../models';
             <a routerLink="/dashboard" routerLinkActive="text-blue-400" [routerLinkActiveOptions]="{ exact: true }" class="text-slate-300 hover:text-white transition-all duration-300">Dashboard</a>
             <a routerLink="/portfolio" routerLinkActive="text-blue-400" class="text-slate-300 hover:text-white transition-all duration-300">Portfolios</a>
             <a routerLink="/analytics" class="text-slate-300 hover:text-white transition-all duration-300">Analytics</a>
+            <a routerLink="/nebula" routerLinkActive="text-blue-400" class="text-slate-300 hover:text-white transition-all duration-300">Nebula</a>
             <a class="text-slate-500 cursor-not-allowed">Watchlist</a>
           </div>
           <ng-template #publicNav></ng-template>
