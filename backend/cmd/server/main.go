@@ -54,6 +54,12 @@ func main() {
 	// handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	profileHandler := handlers.NewProfileHandler(userRepo)
+	aiServiceURL := os.Getenv("AI_SERVICE_URL")
+	if aiServiceURL == "" {
+		aiServiceURL = "http://localhost:8000"
+	}
+	aiGatewayService := services.NewAIGatewayService(aiServiceURL)
+	aiHandler := handlers.NewAIHandler(aiGatewayService)
 
 	router := mux.NewRouter()
 
@@ -135,6 +141,12 @@ func main() {
 		"/holdings/{id}",
 		middleware.AuthMiddleware(http.HandlerFunc(holdingHandler.Update)),
 	).Methods("PUT")
+
+	// AI recommendation gateway routes (Python ML service)
+	api.Handle(
+		"/ai/recommend",
+		middleware.AuthMiddleware(http.HandlerFunc(aiHandler.Recommend)),
+	).Methods("POST")
 
 	// CORS middleware
 	withCORS := func(h http.Handler) http.Handler {
