@@ -43,6 +43,8 @@ func main() {
     router.POST("/predict/risk-drift", handler.RiskDriftHandler)
 
     router.POST("/portfolio/explain", handler.PortfolioExplainHandler)
+    router.POST("/portfolio/summarize", handler.PortfolioSummarizeHandler)
+    router.POST("/portfolio/changes", handler.PortfolioChangesHandler)
 
     router.POST("/compare", handler.CompareHandler)
 
