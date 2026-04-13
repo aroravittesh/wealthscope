@@ -1,5 +1,6 @@
-import { Routes } from '@angular/router';
+import { CanActivateFn, Router, Routes } from '@angular/router';
 import { AuthGuard } from './guards/auth.guard';
+import { inject } from '@angular/core';
 import { LoginComponent } from './features/pages/login/login';
 import { SignupComponent } from './features/pages/signup/signup';
 import { PaymentComponent } from './features/payment/payment.component';
@@ -24,7 +25,19 @@ import { SystemHealthComponent } from './features/system-health.component';
 import { DevopsTestingComponent } from './features/devops-testing.component';
 import { PortfolioListComponent } from './features/portfolio/portfolio-list/portfolio-list.component';
 import { HoldingsComponent } from './features/portfolio/holdings/holdings.component';
+import { AiRecommendationsComponent } from './features/ai-recommendations/ai-recommendations.component';
+import { AuthService } from './services/auth.service';
 
+const rootRedirectIfAuthenticated: CanActivateFn = () => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+
+  if (authService.isAuthenticated()) {
+    return router.createUrlTree(['/dashboard']);
+  }
+
+  return true;
+};
 
 export const routes: Routes = [
     {
@@ -46,6 +59,7 @@ export const routes: Routes = [
     },
   {
     path: '',
+    canActivate: [rootRedirectIfAuthenticated],
     component: LandingComponent
   },
   {
@@ -73,6 +87,11 @@ export const routes: Routes = [
     path: 'portfolio/:portfolioId/holdings',
     canActivate: [AuthGuard],
     component: HoldingsComponent
+  },
+  {
+    path: 'nebula',
+    canActivate: [AuthGuard],
+    component: AiRecommendationsComponent
   },
   // Product routes
   {

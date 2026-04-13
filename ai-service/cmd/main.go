@@ -1,14 +1,15 @@
 package main
 
 import (
-    "net/http"
-    "os"
+	"net/http"
+	"os"
 
-    "github.com/gin-gonic/gin"
-    "github.com/joho/godotenv"
-    "wealthscope-ai/internal/handler"
-    "wealthscope-ai/internal/market"
-    "wealthscope-ai/internal/ml"
+	"wealthscope-ai/internal/handler"
+	"wealthscope-ai/internal/market"
+	"wealthscope-ai/internal/ml"
+
+	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func main() {
