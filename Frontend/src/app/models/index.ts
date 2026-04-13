@@ -98,3 +98,25 @@ export interface ChartData {
     backgroundColor?: string;
   }[];
 }
+
+export interface AIRecommendationPortfolioItem {
+  stock: string;
+}
+
+export interface AIRecommendRequest {
+  userPortfolio: AIRecommendationPortfolioItem[];
+  risk?: string;
+  horizon?: string;
+  topN?: number;
+}
+
+export interface AIRecommendResponse {
+  stock: string;
+  score: number;
+  decision: string;
+  predictedReturn: number;
+  sharpe: number;
+  volatility: number;
+  momentum: number;
+  reason: string;
+}
