@@ -9,6 +9,7 @@ import {
   DashboardMetrics,
   Holding,
   Portfolio,
+  PortfolioSnapshot,
   PortfolioSummary
 } from '../models';
 
@@ -105,6 +106,24 @@ export class PortfolioService {
     );
   }
 
+  createPortfolioSnapshot(portfolioId: string): Observable<PortfolioSnapshot> {
+    return this.http.post<any>(`${this.portfolioApiUrl}/${portfolioId}/snapshots`, {}).pipe(
+      map(raw => this.mapPortfolioSnapshotFromApi(raw, portfolioId))
+    );
+  }
+
+  getPortfolioSnapshots(portfolioId: string): Observable<PortfolioSnapshot[]> {
+    return this.http.get<any[]>(`${this.portfolioApiUrl}/${portfolioId}/snapshots`).pipe(
+      map(rows => (rows || []).map(row => this.mapPortfolioSnapshotFromApi(row, portfolioId)))
+    );
+  }
+
+  getPortfolioSnapshotById(portfolioId: string, snapshotId: string): Observable<PortfolioSnapshot> {
+    return this.http.get<any>(`${this.portfolioApiUrl}/${portfolioId}/snapshots/${snapshotId}`).pipe(
+      map(raw => this.mapPortfolioSnapshotFromApi(raw, portfolioId))
+    );
+  }
+
   getHoldings(portfolioId: string): Observable<Holding[]> {
     return this.http
       .get<any[]>(`${this.holdingsApiUrl}/${portfolioId}`)
@@ -176,4 +195,15 @@ export class PortfolioService {
     value: Number(row.value ?? 0),
     percent: Number(row.percent ?? 0)
   });
+
+  private mapPortfolioSnapshotFromApi(raw: any, portfolioId: string): PortfolioSnapshot {
+    const summaryRaw = raw.summary ?? raw.portfolio_summary ?? raw;
+    return {
+      id: String(raw.id ?? raw.snapshot_id ?? raw.snapshotId ?? ''),
+      portfolioId: String(raw.portfolio_id ?? raw.portfolioId ?? portfolioId),
+      portfolioName: raw.portfolio_name ?? raw.portfolioName ?? summaryRaw?.portfolio_name ?? summaryRaw?.portfolioName,
+      createdAt: new Date(raw.created_at ?? raw.createdAt ?? new Date().toISOString()),
+      summary: this.mapPortfolioSummaryFromApi(summaryRaw)
+    };
+  }
 }
