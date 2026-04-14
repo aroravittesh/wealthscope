@@ -1,0 +1,10 @@
+{
+  "labels": [
+    "STOCK_PRICE",
+    "RISK_ANALYSIS",
+    "MARKET_NEWS",
+    "PORTFOLIO_TIP",
+    "GENERAL_MARKET",
+    "UNKNOWN"
+  ]
+}
