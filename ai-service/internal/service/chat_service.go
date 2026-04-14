@@ -12,6 +12,43 @@ import (
 	"wealthscope-ai/internal/rag"
 )
 
+// EnvelopeMarketFetchers overrides live market/news HTTP for BuildEnvelopeInputForChat (tests).
+type EnvelopeMarketFetchers struct {
+	GetStockQuote      func(symbol string) (*market.GlobalQuote, error)
+	GetCompanyOverview func(symbol string) (*market.CompanyOverview, error)
+	GetMarketNews      func(symbol string) ([]market.NewsItem, error)
+}
+
+var envelopeMarketFetchers *EnvelopeMarketFetchers
+
+// SetEnvelopeMarketFetchersForTest installs fetcher overrides; pass nil to clear.
+func SetEnvelopeMarketFetchersForTest(f *EnvelopeMarketFetchers) (cleanup func()) {
+	prev := envelopeMarketFetchers
+	envelopeMarketFetchers = f
+	return func() { envelopeMarketFetchers = prev }
+}
+
+func resolveQuoteFn() func(string) (*market.GlobalQuote, error) {
+	if envelopeMarketFetchers != nil && envelopeMarketFetchers.GetStockQuote != nil {
+		return envelopeMarketFetchers.GetStockQuote
+	}
+	return market.GetStockQuote
+}
+
+func resolveOverviewFn() func(string) (*market.CompanyOverview, error) {
+	if envelopeMarketFetchers != nil && envelopeMarketFetchers.GetCompanyOverview != nil {
+		return envelopeMarketFetchers.GetCompanyOverview
+	}
+	return market.GetCompanyOverview
+}
+
+func resolveNewsFn() func(string) ([]market.NewsItem, error) {
+	if envelopeMarketFetchers != nil && envelopeMarketFetchers.GetMarketNews != nil {
+		return envelopeMarketFetchers.GetMarketNews
+	}
+	return market.GetMarketNews
+}
+
 // ChatServiceInterface allows mocking in unit tests
 type ChatServiceInterface interface {
 	ProcessMessage(sessionID string, message string) (string, error)
@@ -28,7 +65,14 @@ func (s *chatService) ProcessMessage(sessionID string, message string) (string, 
 }
 
 func ProcessMessage(sessionID string, message string) (string, error) {
+	in := BuildEnvelopeInputForChat(message)
+	enriched := chatprompt.BuildUserContent(in)
+	return openai.CallOpenAI(sessionID, enriched)
+}
 
+// BuildEnvelopeInputForChat runs retrieval, optional live market enrichment, and intent/sentiment metadata.
+// Exposed for tests (no OpenAI call).
+func BuildEnvelopeInputForChat(message string) chatprompt.EnvelopeInput {
 	ent := entity.Extract(message)
 	intentResult := ml.DetectIntent(message)
 	sentiment := ml.AnalyzeSentiment(message)
@@ -54,14 +98,14 @@ func ProcessMessage(sessionID string, message string) (string, error) {
 	if shouldEnrichMarket(intentResult.Intent, intentResult.Ticker) {
 		ticker := intentResult.Ticker
 
-		quote, err := market.GetStockQuote(ticker)
+		quote, err := resolveQuoteFn()(ticker)
 		if err == nil {
 			fmt.Fprintf(&liveMarket, "Quote (%s): price $%s | high $%s | low $%s | change %s (%s) | volume %s\n",
 				quote.Symbol, quote.Price, quote.High, quote.Low,
 				quote.Change, quote.ChangePercent, quote.Volume)
 		}
 
-		overview, err := market.GetCompanyOverview(ticker)
+		overview, err := resolveOverviewFn()(ticker)
 		if err == nil {
 			fmt.Fprintf(&liveMarket, "Fundamentals: %s | sector %s | industry %s | market cap $%s | P/E %s | EPS %s | beta %s | 52w high $%s | 52w low $%s | div yield %s | profit margin %s\nDescription (excerpt): %s",
 				overview.Name, overview.Sector, overview.Industry,
@@ -72,7 +116,7 @@ func ProcessMessage(sessionID string, message string) (string, error) {
 			)
 		}
 
-		news, err := market.GetMarketNews(ticker)
+		news, err := resolveNewsFn()(ticker)
 		if err == nil && len(news) > 0 {
 			for i, article := range news {
 				if i >= 3 {
@@ -84,7 +128,7 @@ func ProcessMessage(sessionID string, message string) (string, error) {
 		}
 	}
 
-	enriched := chatprompt.BuildUserContent(chatprompt.EnvelopeInput{
+	return chatprompt.EnvelopeInput{
 		UserMessage:      message,
 		KnowledgeLines:   knowledgeLines,
 		QAKnowledgeLines: qaKnowledgeLines,
@@ -95,9 +139,7 @@ func ProcessMessage(sessionID string, message string) (string, error) {
 		Ticker:           intentResult.Ticker,
 		Sentiment:        string(sentiment),
 		IntentConfidence: intentResult.Confidence,
-	})
-
-	return openai.CallOpenAI(sessionID, enriched)
+	}
 }
 
 func shouldEnrichMarket(intent ml.Intent, ticker string) bool {

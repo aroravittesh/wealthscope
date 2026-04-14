@@ -82,6 +82,35 @@ func TestRetrieveQAWithContext_FromTempFile(t *testing.T) {
 	}
 }
 
+func TestLoadQADatasetFromPath_EmptyDataRows(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "empty.csv")
+	body := strings.Join(qaHeader, ",") + "\n"
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := LoadQADatasetFromPath(p)
+	if err == nil {
+		t.Fatal("expected error for zero data rows")
+	}
+}
+
+func TestLoadQADatasetFromPath_WrongFieldCount(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "badrow.csv")
+	lines := []string{
+		strings.Join(qaHeader, ","),
+		"only,one",
+	}
+	if err := os.WriteFile(p, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := LoadQADatasetFromPath(p)
+	if err == nil {
+		t.Fatal("expected error for malformed row width")
+	}
+}
+
 func TestFormatQAKnowledgeLine_Truncates(t *testing.T) {
 	ch := KnowledgeChunk{ID: "QA0001", Topic: "A / B"}
 	q := strings.Repeat("w", 300)
