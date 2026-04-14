@@ -1,0 +1,48 @@
+<section class="chatbot-panel" role="dialog" aria-label="WealthScope chatbot">
+  <header class="chatbot-header">
+    <div>
+      <h3>{{ title }}</h3>
+      <p>{{ subtitle }}</p>
+    </div>
+    <button type="button" class="close-btn" aria-label="Close chatbot" (click)="onClose()">
+      ✕
+    </button>
+  </header>
+
+  <div #messagesContainer class="chatbot-messages">
+    <div
+      *ngFor="let message of messages; trackBy: trackByMessage"
+      class="message-row"
+      [class.user]="message.sender === 'user'"
+    >
+      <article
+        class="message-bubble"
+        [class.bot]="message.sender === 'bot'"
+        [class.error]="message.error"
+      >
+        {{ message.text }}
+      </article>
+    </div>
+
+    <div *ngIf="isLoading" class="message-row">
+      <article class="message-bubble bot loading">
+        Leo is typing...
+      </article>
+    </div>
+  </div>
+
+  <p *ngIf="requestError" class="request-error">{{ requestError }}</p>
+
+  <form class="chat-input-row" (submit)="sendMessage()">
+    <input
+      type="text"
+      name="chatMessage"
+      autocomplete="off"
+      placeholder="Ask Leo about markets or your portfolio..."
+      [(ngModel)]="draftMessage"
+      [disabled]="isLoading"
+      (keydown.enter)="onEnterSubmit($event)"
+    />
+    <button type="submit" [disabled]="isLoading || !draftMessage.trim()">Send</button>
+  </form>
+</section>

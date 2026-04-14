@@ -1,0 +1,17 @@
+<button
+  class="chatbot-launcher"
+  type="button"
+  aria-label="Open WealthScope chatbot"
+  [attr.aria-expanded]="isOpen"
+  (click)="toggleChat()"
+>
+  <img
+    *ngIf="!iconLoadFailed"
+    src="assets/images/leo-chatbot.png"
+    alt="Leo chatbot"
+    (error)="onIconError()"
+  />
+  <span *ngIf="iconLoadFailed" class="fallback-icon" aria-hidden="true">🤖</span>
+</button>
+
+<app-chatbot-panel *ngIf="isOpen" (close)="closeChat()"></app-chatbot-panel>
