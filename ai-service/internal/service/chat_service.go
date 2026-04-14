@@ -34,11 +34,18 @@ func ProcessMessage(sessionID string, message string) (string, error) {
 	sentiment := ml.AnalyzeSentiment(message)
 
 	var knowledgeLines []string
+	var qaKnowledgeLines []string
 	rctx := rag.RetrievalContextFromEntity(ent)
 	chunks := rag.RetrieveWithContext(message, rctx, 3)
 	for _, ch := range chunks {
 		knowledgeLines = append(knowledgeLines,
 			fmt.Sprintf("[%s] %s", ch.Topic, strings.TrimSpace(ch.Content)))
+	}
+
+	qaChunks := rag.RetrieveQAWithContext(message, rctx, 3)
+	for _, ch := range qaChunks {
+		q, a := rag.ChunkQAPair(ch)
+		qaKnowledgeLines = append(qaKnowledgeLines, rag.FormatQAKnowledgeLine(ch, q, a))
 	}
 
 	var liveMarket strings.Builder
@@ -80,6 +87,7 @@ func ProcessMessage(sessionID string, message string) (string, error) {
 	enriched := chatprompt.BuildUserContent(chatprompt.EnvelopeInput{
 		UserMessage:      message,
 		KnowledgeLines:   knowledgeLines,
+		QAKnowledgeLines: qaKnowledgeLines,
 		LiveMarketBody:   strings.TrimSpace(liveMarket.String()),
 		NewsBody:         strings.TrimSpace(newsBody.String()),
 		PortfolioBody:    "",

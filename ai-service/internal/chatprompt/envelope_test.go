@@ -9,6 +9,7 @@ func TestBuildUserContent_SectionOrderAndHeaders(t *testing.T) {
 	out := BuildUserContent(EnvelopeInput{
 		UserMessage:      "What is beta?",
 		KnowledgeLines:   []string{"[risk] Beta measures volatility."},
+		QAKnowledgeLines: []string{"[QA0001 | Stock Basics / x] Q: What is beta? | A: Beta measures market sensitivity."},
 		LiveMarketBody:   "Quote: AAPL $180",
 		NewsBody:         "1. Headline",
 		PortfolioBody:    "",
@@ -19,15 +20,19 @@ func TestBuildUserContent_SectionOrderAndHeaders(t *testing.T) {
 	})
 
 	ik := strings.Index(out, SectionKnowledge)
+	iq := strings.Index(out, SectionQAKnowledge)
 	il := strings.Index(out, SectionLiveMarket)
 	in := strings.Index(out, SectionNews)
 	ip := strings.Index(out, SectionPortfolio)
 	is := strings.Index(out, SectionSystem)
-	if ik < 0 || il < 0 || in < 0 || ip < 0 || is < 0 {
-		t.Fatalf("missing section: k=%d l=%d n=%d p=%d s=%d", ik, il, in, ip, is)
+	if ik < 0 || iq < 0 || il < 0 || in < 0 || ip < 0 || is < 0 {
+		t.Fatalf("missing section: k=%d q=%d l=%d n=%d p=%d s=%d", ik, iq, il, in, ip, is)
 	}
-	if !(ik < il && il < in && in < ip && ip < is) {
-		t.Fatal("sections should appear in order: knowledge → live market → news → portfolio → system")
+	if !(ik < iq && iq < il && il < in && in < ip && ip < is) {
+		t.Fatal("sections should appear in order: knowledge → QA knowledge → live market → news → portfolio → system")
+	}
+	if !strings.Contains(out, "QA0001") {
+		t.Fatal("expected QA line in envelope")
 	}
 	if !strings.Contains(out, "What is beta?") {
 		t.Fatal("original user message missing")
@@ -42,6 +47,9 @@ func TestBuildUserContent_MissingKnowledge(t *testing.T) {
 	})
 	if !strings.Contains(out, "No curated knowledge snippets") {
 		t.Fatalf("expected empty knowledge note: %s", out)
+	}
+	if !strings.Contains(out, "No matching Q&A knowledge rows") {
+		t.Fatal("expected empty QA knowledge note")
 	}
 }
 
