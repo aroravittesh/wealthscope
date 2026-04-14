@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -24,6 +25,35 @@ type OpenAIResponse struct {
 	Choices []struct {
 		Message Message `json:"message"`
 	} `json:"choices"`
+}
+
+var (
+	chatHTTPClient      *http.Client
+	chatCompletionsURL  = "https://api.openai.com/v1/chat/completions"
+)
+
+func chatHTTP() *http.Client {
+	if chatHTTPClient != nil {
+		return chatHTTPClient
+	}
+	return http.DefaultClient
+}
+
+// SetChatHTTPTestConfig swaps the HTTP client and chat-completions URL used by CallOpenAI.
+// Pass client nil to keep default client; pass url "" to keep default URL.
+func SetChatHTTPTestConfig(client *http.Client, completionsURL string) (cleanup func()) {
+	prevC := chatHTTPClient
+	prevU := chatCompletionsURL
+	if client != nil {
+		chatHTTPClient = client
+	}
+	if strings.TrimSpace(completionsURL) != "" {
+		chatCompletionsURL = completionsURL
+	}
+	return func() {
+		chatHTTPClient = prevC
+		chatCompletionsURL = prevU
+	}
 }
 
 func getSystemPrompt() string {
@@ -44,7 +74,7 @@ STRICT RULES:
 
 GROUNDING:
 - The user message may include a "Grounded context" block with labeled sections such as
-  [Relevant Financial Knowledge], [Live Market Data], [News Context], [Portfolio Context], [System Context].
+  [Relevant Financial Knowledge], [Relevant QA Knowledge], [Live Market Data], [News Context], [Portfolio Context], [System Context].
 - Base factual claims on those sections when they contain data. Do not invent quotes, prices, or headlines.
 - If a section says no data was provided or attached, say clearly that the information is not available in this context (do not guess).
 
@@ -81,7 +111,7 @@ func CallOpenAI(sessionID string, userInput string) (string, error) {
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		"https://api.openai.com/v1/chat/completions", bytes.NewBuffer(jsonData))
+		chatCompletionsURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", err
 	}
@@ -89,8 +119,7 @@ func CallOpenAI(sessionID string, userInput string) (string, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+os.Getenv("OPENAI_API_KEY"))
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := chatHTTP().Do(req)
 	if err != nil {
 		return "", err
 	}

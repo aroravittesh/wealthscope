@@ -53,6 +53,27 @@ func TestBuildUserContent_MissingKnowledge(t *testing.T) {
 	}
 }
 
+func TestBuildUserContent_SectionHeadersAppearOnce(t *testing.T) {
+	out := BuildUserContent(EnvelopeInput{
+		UserMessage:      "Hello",
+		KnowledgeLines:   []string{"[x] y"},
+		QAKnowledgeLines: []string{"[QA1 | A / B] Q: q | A: a"},
+		LiveMarketBody:   "m",
+		NewsBody:         "n",
+		PortfolioBody:    "p",
+		Intent:           "X",
+		Sentiment:        "NEUTRAL",
+	})
+	for _, title := range []string{
+		SectionKnowledge, SectionQAKnowledge, SectionLiveMarket,
+		SectionNews, SectionPortfolio, SectionSystem,
+	} {
+		if strings.Count(out, title) != 1 {
+			t.Fatalf("expected exactly one %q, count=%d", title, strings.Count(out, title))
+		}
+	}
+}
+
 func TestBuildUserContent_MissingMarketAndNews(t *testing.T) {
 	out := BuildUserContent(EnvelopeInput{
 		UserMessage: "Explain P/E",

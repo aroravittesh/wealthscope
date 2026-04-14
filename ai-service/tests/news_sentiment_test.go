@@ -46,6 +46,23 @@ func TestNewsSentiment_AggregateBearish(t *testing.T) {
 	}
 }
 
+func TestNewsSentiment_AggregateMixedBullAndBearPopulatesBothTops(t *testing.T) {
+	articles := []market.NewsItem{
+		{Title: "Rally surge gain upside momentum continues", Description: "Strong gains and growth outlook"},
+		{Title: "Crash plunge collapse downside losses deepen", Description: "Bearish slide and steep decline"},
+	}
+	r := newsentiment.Aggregate("XOM", articles)
+	if r.ArticleCount != 2 {
+		t.Fatalf("article count %d", r.ArticleCount)
+	}
+	if r.TopPositiveArticle == "" || r.TopNegativeArticle == "" {
+		t.Fatalf("expected both top article fields set, got pos=%q neg=%q", r.TopPositiveArticle, r.TopNegativeArticle)
+	}
+	if r.OverallSentiment != string(ml.SentimentBullish) && r.OverallSentiment != string(ml.SentimentBearish) && r.OverallSentiment != string(ml.SentimentNeutral) {
+		t.Fatalf("unexpected overall %q", r.OverallSentiment)
+	}
+}
+
 func TestNewsSentiment_AggregateNeutral(t *testing.T) {
 	articles := []market.NewsItem{
 		{Title: "Company schedules quarterly report", Description: "The firm will release figures next week"},

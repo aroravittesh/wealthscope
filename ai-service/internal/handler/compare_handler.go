@@ -9,30 +9,40 @@ import (
 	"wealthscope-ai/internal/compare"
 )
 
+// HTTPStatusForCompareError maps compare errors to HTTP status codes for POST /compare.
+func HTTPStatusForCompareError(err error) int {
+	switch {
+	case errors.Is(err, compare.ErrInvalidSymbolCount), errors.Is(err, compare.ErrEmptySymbol):
+		return http.StatusBadRequest
+	default:
+		msg := err.Error()
+		if strings.Contains(msg, "quote:") || strings.Contains(msg, "overview:") {
+			return http.StatusBadGateway
+		}
+		return http.StatusInternalServerError
+	}
+}
+
 // CompareHandler handles POST /compare.
 func CompareHandler(c *gin.Context) {
-	var req compare.Request
-	if err := c.BindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
-		return
-	}
+	CompareHandlerWithFetcher(compare.LiveFetcher{})(c)
+}
 
-	resp, err := compare.Compare(compare.LiveFetcher{}, req.Symbols)
-	if err != nil {
-		switch {
-		case errors.Is(err, compare.ErrInvalidSymbolCount):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		case errors.Is(err, compare.ErrEmptySymbol):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		default:
-			if strings.Contains(err.Error(), "quote:") || strings.Contains(err.Error(), "overview:") {
-				c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-				return
-			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+// CompareHandlerWithFetcher allows injecting a fetcher (tests).
+func CompareHandlerWithFetcher(fetcher compare.Fetcher) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req compare.Request
+		if err := c.BindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
+			return
 		}
-		return
-	}
 
-	c.JSON(http.StatusOK, resp)
+		resp, err := compare.Compare(fetcher, req.Symbols)
+		if err != nil {
+			c.JSON(HTTPStatusForCompareError(err), gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, resp)
+	}
 }
