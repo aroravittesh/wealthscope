@@ -14,13 +14,13 @@ import (
 )
 
 type fakeUserRepository struct {
-	findByEmailFn        func(email string) (*models.User, error)
-	createFn              func(user *models.User) error
-	findByIDFn           func(id string) (*models.User, error)
-	updatePasswordFn     func(userID string, passwordHash string) error
-	updateRiskPrefFn     func(userID string, riskPreference string) error
-	createCalls           int
-	updatePasswordCalls  int
+	findByEmailFn       func(email string) (*models.User, error)
+	createFn            func(user *models.User) error
+	findByIDFn          func(id string) (*models.User, error)
+	updatePasswordFn    func(userID string, passwordHash string) error
+	updateRiskPrefFn    func(userID string, riskPreference string) error
+	createCalls         int
+	updatePasswordCalls int
 }
 
 func (f *fakeUserRepository) Create(user *models.User) error {
@@ -60,6 +60,14 @@ func (f *fakeUserRepository) UpdateRiskPreference(userID string, riskPreference 
 	return f.updateRiskPrefFn(userID, riskPreference)
 }
 
+func (f *fakeUserRepository) ListAllPublic() ([]models.UserPublic, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (f *fakeUserRepository) UpdateRole(userID string, role string) error {
+	return errors.New("not implemented")
+}
+
 type fakeRefreshTokenRepository struct {
 	findFn         func(token string) (*repository.RefreshToken, error)
 	createFn       func(t *repository.RefreshToken) error
@@ -69,8 +77,8 @@ type fakeRefreshTokenRepository struct {
 	createCalls int
 	deleteCalls int
 
-	lastCreatedToken *repository.RefreshToken
-	lastDeletedToken string
+	lastCreatedToken  *repository.RefreshToken
+	lastDeletedToken  string
 	lastDeletedByUser string
 }
 
@@ -253,7 +261,7 @@ func TestAuthService_Login_Success(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	if rtRepo.lastCreatedToken.ExpiresAt.Before(now.Add(-1*time.Second)) {
+	if rtRepo.lastCreatedToken.ExpiresAt.Before(now.Add(-1 * time.Second)) {
 		t.Fatalf("expected refresh token ExpiresAt to be in the future")
 	}
 }
@@ -476,4 +484,3 @@ func TestAuthService_ChangePassword_UserNotFound(t *testing.T) {
 		t.Fatalf("expected UpdatePassword not to be called")
 	}
 }
-

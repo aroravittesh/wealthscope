@@ -101,3 +101,40 @@ func (r *UserRepositoryPG) UpdateRiskPreference(userID string, riskPreference st
 	_, err := r.DB.Exec(query, riskPreference, userID)
 	return err
 }
+
+func (r *UserRepositoryPG) ListAllPublic() ([]models.UserPublic, error) {
+	rows, err := r.DB.Query(`
+		SELECT id, email, role, risk_preference, created_at
+		FROM users
+		ORDER BY created_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []models.UserPublic
+	for rows.Next() {
+		var u models.UserPublic
+		if err := rows.Scan(&u.ID, &u.Email, &u.Role, &u.RiskPreference, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
+func (r *UserRepositoryPG) UpdateRole(userID string, role string) error {
+	res, err := r.DB.Exec(`UPDATE users SET role = $1 WHERE id = $2`, role, userID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return errors.New("user not found")
+	}
+	return nil
+}

@@ -16,7 +16,7 @@ type fakeHoldingRepository struct {
 	getByIDFn        func(id string) (*models.Holding, error)
 	updateByIDFn     func(id string, quantity float64, avgPrice float64) error
 
-	createOrUpdateCalls int
+	createOrUpdateCalls  int
 	lastCreatedOrUpdated *models.Holding
 }
 
@@ -186,4 +186,3 @@ func TestHoldingService_DeleteHolding_PassesThrough(t *testing.T) {
 }
 
 var _ repository.HoldingRepository = (*fakeHoldingRepository)(nil)
-
