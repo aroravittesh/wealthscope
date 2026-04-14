@@ -4,11 +4,12 @@ import { CommonModule } from '@angular/common';
 import { NavbarComponent } from './shared/navbar.component';
 import { AuthService } from './services/auth.service';
 import { filter } from 'rxjs/operators';
+import { ChatbotLauncherComponent } from './features/chatbot/chatbot-launcher.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, CommonModule, NavbarComponent],
+  imports: [RouterOutlet, CommonModule, NavbarComponent, ChatbotLauncherComponent],
   template: `
     <div class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <app-navbar *ngIf="showNavbar"></app-navbar>
@@ -16,6 +17,7 @@ import { filter } from 'rxjs/operators';
       <main [class]="showNavbar ? ' mx-auto  ' : ''">
         <router-outlet></router-outlet>
       </main>
+      <app-chatbot-launcher></app-chatbot-launcher>
     </div>
   `,
   styles: []
