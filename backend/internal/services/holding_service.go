@@ -13,7 +13,6 @@ type HoldingService struct {
 	PortfolioRepo repository.PortfolioRepository
 }
 
-
 func (s *HoldingService) AddHolding(
 	userID string,
 	portfolioID string,

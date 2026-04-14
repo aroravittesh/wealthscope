@@ -8,4 +8,6 @@ type UserRepository interface {
 	FindByID(id string) (*models.User, error)
 	UpdatePassword(userID string, passwordHash string) error
 	UpdateRiskPreference(userID string, riskPreference string) error
+	ListAllPublic() ([]models.UserPublic, error)
+	UpdateRole(userID string, role string) error
 }

@@ -28,6 +28,8 @@ func main() {
 	userRepo := repository.NewUserRepository(database)
 	portfolioRepo := repository.NewPortfolioRepository(database)
 	holdingRepo := repository.NewHoldingRepository(database)
+	assetRepo := repository.NewAssetRepository(database)
+	snapshotRepo := repository.NewPortfolioSnapshotRepository(database)
 
 	portfolioService := &services.PortfolioService{
 		PortfolioRepo: portfolioRepo,
@@ -60,6 +62,13 @@ func main() {
 	}
 	aiGatewayService := services.NewAIGatewayService(aiServiceURL)
 	aiHandler := handlers.NewAIHandler(aiGatewayService)
+
+	adminHandler := handlers.NewAdminHandler(userRepo, assetRepo)
+	reportingHandler := handlers.NewReportingHandler(portfolioService, snapshotRepo)
+
+	adminOnly := func(h http.HandlerFunc) http.Handler {
+		return middleware.AuthMiddleware(middleware.RequireRole("ADMIN")(h))
+	}
 
 	router := mux.NewRouter()
 
@@ -120,6 +129,24 @@ func main() {
 		"/portfolios/{id}/summary",
 		middleware.AuthMiddleware(http.HandlerFunc(portfolioHandler.GetSummary)),
 	).Methods("GET")
+
+	api.Handle(
+		"/portfolios/{id}/snapshots",
+		middleware.AuthMiddleware(http.HandlerFunc(reportingHandler.CreatePortfolioSnapshot)),
+	).Methods("POST")
+
+	api.Handle(
+		"/portfolios/{id}/snapshots",
+		middleware.AuthMiddleware(http.HandlerFunc(reportingHandler.ListPortfolioSnapshots)),
+	).Methods("GET")
+
+	// admin (JWT role ADMIN)
+	api.Handle("/admin/users", adminOnly(adminHandler.ListUsers)).Methods("GET")
+	api.Handle("/admin/users/{id}/role", adminOnly(adminHandler.UpdateUserRole)).Methods("PATCH")
+	api.Handle("/admin/assets", adminOnly(adminHandler.ListAssets)).Methods("GET")
+	api.Handle("/admin/assets", adminOnly(adminHandler.CreateAsset)).Methods("POST")
+	api.Handle("/admin/assets/{id}", adminOnly(adminHandler.UpdateAsset)).Methods("PUT")
+	api.Handle("/admin/assets/{id}", adminOnly(adminHandler.DeleteAsset)).Methods("DELETE")
 
 	// ✅ holdings routes
 	api.Handle(

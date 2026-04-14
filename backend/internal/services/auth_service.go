@@ -103,8 +103,6 @@ func (s *AuthService) Register(
 	return s.UserRepo.Create(user)
 }
 
-
-
 func (s *AuthService) Login(
 	email string,
 	password string,
@@ -194,7 +192,6 @@ func (s *AuthService) RefreshAccessToken(oldToken string) (string, string, error
 
 	return accessToken, newRefreshToken, nil
 }
-
 
 func (s *AuthService) ChangePassword(
 	userID string,
