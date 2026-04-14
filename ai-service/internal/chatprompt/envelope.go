@@ -7,17 +7,19 @@ import (
 
 // Section headers for grounded context (stable for prompts and tests).
 const (
-	SectionKnowledge  = "[Relevant Financial Knowledge]"
-	SectionLiveMarket = "[Live Market Data]"
-	SectionNews       = "[News Context]"
-	SectionPortfolio  = "[Portfolio Context]"
-	SectionSystem     = "[System Context]"
+	SectionKnowledge   = "[Relevant Financial Knowledge]"
+	SectionQAKnowledge = "[Relevant QA Knowledge]"
+	SectionLiveMarket  = "[Live Market Data]"
+	SectionNews        = "[News Context]"
+	SectionPortfolio   = "[Portfolio Context]"
+	SectionSystem      = "[System Context]"
 )
 
 // EnvelopeInput carries optional context blocks for the user message sent to the LLM.
 type EnvelopeInput struct {
 	UserMessage      string
 	KnowledgeLines   []string // each full line e.g. "[topic] content"
+	QAKnowledgeLines []string // curated Q&A CSV retrieval lines
 	LiveMarketBody   string   // preformatted quote + fundamentals, or empty
 	NewsBody         string   // preformatted headlines, or empty
 	PortfolioBody    string   // empty → default "no portfolio" line
@@ -52,6 +54,19 @@ func BuildUserContent(in EnvelopeInput) string {
 		b.WriteString("(No curated knowledge snippets were retrieved for this query.)")
 	} else {
 		for _, line := range in.KnowledgeLines {
+			b.WriteString("- ")
+			b.WriteString(strings.TrimSpace(line))
+			b.WriteByte('\n')
+		}
+	}
+
+	b.WriteString("\n\n")
+	b.WriteString(SectionQAKnowledge)
+	b.WriteByte('\n')
+	if len(in.QAKnowledgeLines) == 0 {
+		b.WriteString("(No matching Q&A knowledge rows were retrieved for this query.)")
+	} else {
+		for _, line := range in.QAKnowledgeLines {
 			b.WriteString("- ")
 			b.WriteString(strings.TrimSpace(line))
 			b.WriteByte('\n')
