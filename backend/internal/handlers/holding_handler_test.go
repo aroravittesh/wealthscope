@@ -18,10 +18,10 @@ import (
 )
 
 type fakeHoldingRepo struct {
-	addFn       func(h *models.Holding) error
-	getByPortFn func(portfolioID string) ([]models.Holding, error)
-	deleteFn    func(id string) error
-	getByIDFn   func(id string) (*models.Holding, error)
+	addFn        func(h *models.Holding) error
+	getByPortFn  func(portfolioID string) ([]models.Holding, error)
+	deleteFn     func(id string) error
+	getByIDFn    func(id string) (*models.Holding, error)
 	updateByIDFn func(id string, quantity float64, avgPrice float64) error
 }
 
@@ -204,4 +204,3 @@ func TestHoldingHandler_Delete_Error(t *testing.T) {
 		t.Fatalf("expected status 400, got %d", rec.Result().StatusCode)
 	}
 }
-

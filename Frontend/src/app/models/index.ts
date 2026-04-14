@@ -89,6 +89,14 @@ export interface PortfolioSummary {
   assetAllocation: AssetAllocationRow[];
 }
 
+export interface PortfolioSnapshot {
+  id: string;
+  portfolioId: string;
+  portfolioName?: string;
+  createdAt: Date;
+  summary: PortfolioSummary;
+}
+
 export interface ChartData {
   labels: string[];
   datasets: {

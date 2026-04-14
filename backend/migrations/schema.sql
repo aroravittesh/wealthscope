@@ -37,6 +37,15 @@ CREATE TABLE portfolios (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Point-in-time portfolio analytics snapshots (reporting)
+CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    portfolio_id UUID NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    summary_json TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- =========================
 -- ASSETS
 -- =========================

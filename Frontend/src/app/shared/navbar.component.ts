@@ -1,6 +1,5 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { User } from '../models';
@@ -8,7 +7,7 @@ import { User } from '../models';
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule],
   template: `
     <nav class="bg-slate-800 bg-opacity-50 backdrop-filter backdrop-blur-lg border-b border-slate-700 sticky top-0 z-50 transition-all duration-300 hover:bg-opacity-70">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -25,6 +24,7 @@ import { User } from '../models';
             <a routerLink="/portfolio" routerLinkActive="text-blue-400" class="text-slate-300 hover:text-white transition-all duration-300">Portfolios</a>
             <a routerLink="/analytics" class="text-slate-300 hover:text-white transition-all duration-300">Analytics</a>
             <a routerLink="/nebula" routerLinkActive="text-blue-400" class="text-slate-300 hover:text-white transition-all duration-300">Nebula</a>
+            <a *ngIf="currentUser?.role === 'ADMIN'" routerLink="/admin" routerLinkActive="text-blue-400" class="text-slate-300 hover:text-white transition-all duration-300">Admin</a>
             <a class="text-slate-500 cursor-not-allowed">Watchlist</a>
           </div>
           <ng-template #publicNav></ng-template>
@@ -34,12 +34,6 @@ import { User } from '../models';
             <button type="button" (click)="onLogout()" class="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">
               Logout
             </button>
-            <div *ngIf="currentUser" class="hidden md:block">
-              <select [(ngModel)]="currentUser.role" (change)="onRoleChange()" class="bg-slate-700 text-xs text-slate-300 rounded px-2 py-1 border border-slate-600">
-                <option value="USER">USER</option>
-                <option value="ADMIN">ADMIN</option>
-              </select>
-            </div>
           </div>
           <ng-template #guestActions>
             <div class="flex items-center gap-3">
@@ -77,18 +71,5 @@ export class NavbarComponent implements OnInit {
   onLogout(): void {
     this.authService.logout();
     this.router.navigate(['/auth/login']);
-  }
-
-  onRefreshToken(): void {
-    alert('Token refreshed! (UI mock)');
-  }
-
-  onRoleChange(): void {
-    // For demo only.
-    if (this.currentUser) {
-      const user = { ...this.currentUser, role: this.currentUser.role };
-      localStorage.setItem('user', JSON.stringify(user));
-      window.location.reload();
-    }
   }
 }

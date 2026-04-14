@@ -1,5 +1,6 @@
 import { CanActivateFn, Router, Routes } from '@angular/router';
 import { AuthGuard } from './guards/auth.guard';
+import { AdminGuard } from './guards/admin.guard';
 import { inject } from '@angular/core';
 import { LoginComponent } from './features/pages/login/login';
 import { SignupComponent } from './features/pages/signup/signup';
@@ -55,6 +56,7 @@ export const routes: Routes = [
     },
     {
       path: 'admin',
+      canActivate: [AuthGuard, AdminGuard],
       component: AdminDashboardComponent
     },
   {
@@ -147,6 +149,7 @@ export const routes: Routes = [
   },
   {
     path: 'profile',
+    canActivate: [AuthGuard],
     component: UserProfileComponent
   }
 ];
