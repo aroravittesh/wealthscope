@@ -24,12 +24,12 @@ export class ChatbotPanelComponent implements AfterViewChecked {
 
   readonly sessionId = 'demo-session-1';
   readonly title = 'Leo';
-  readonly subtitle = 'WealthScope Assistant';
+  readonly subtitle = 'Aurex Assistant';
 
   messages: ChatMessage[] = [
     {
       sender: 'bot',
-      text: 'Hi, I am Leo. Ask me about your portfolio, market trends, or WealthScope features.',
+      text: 'Hi, I am Leo. Ask me about your portfolio, market trends, or Aurex features.',
       createdAt: new Date()
     }
   ];
