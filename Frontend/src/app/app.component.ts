@@ -50,8 +50,14 @@ export class AppComponent implements OnInit {
   }
 
   private updateNavbarVisibility(): void {
-    // Keep navbar visible on public landing page so login/signup is always reachable.
-    const isLandingPage = this.currentUrl === '/';
+    const path = (this.currentUrl || '/').split('?')[0].split('#')[0];
+    const isLandingPage = path === '/' || path === '';
+    const isAuthPage = path === '/auth/login' || path === '/auth/signup';
+    // Full-bleed auth screens: logo lives in the page, not the global nav.
+    if (isAuthPage) {
+      this.showNavbar = false;
+      return;
+    }
     this.showNavbar = this.isAuthenticated || isLandingPage;
   }
 }
