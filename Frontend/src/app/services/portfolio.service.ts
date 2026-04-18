@@ -197,7 +197,14 @@ export class PortfolioService {
   });
 
   private mapPortfolioSnapshotFromApi(raw: any, portfolioId: string): PortfolioSnapshot {
-    const summaryRaw = raw.summary ?? raw.portfolio_summary ?? raw;
+    let summaryRaw: any = raw.summary ?? raw.portfolio_summary ?? raw.summary_json ?? raw;
+    if (typeof summaryRaw === 'string') {
+      try {
+        summaryRaw = JSON.parse(summaryRaw);
+      } catch {
+        summaryRaw = {};
+      }
+    }
     return {
       id: String(raw.id ?? raw.snapshot_id ?? raw.snapshotId ?? ''),
       portfolioId: String(raw.portfolio_id ?? raw.portfolioId ?? portfolioId),

@@ -40,13 +40,21 @@
   z-index: 2;
 }
 
-.branding h1 {
-  font-size: 42px;
-  margin-bottom: 20px;
-  background: linear-gradient(to right, #3b82f6, #9333ea);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+.branding-logo {
+  display: block;
+  width: min(100%, 360px);
+  height: auto;
+  max-height: clamp(64px, 14vw, 104px);
+  margin-bottom: clamp(1.25rem, 3vw, 2rem);
+  object-fit: contain;
+  object-position: left center;
+}
+
+@media (max-width: 768px) {
+  .branding-logo {
+    max-height: clamp(52px, 18vw, 80px);
+    width: min(100%, 280px);
+  }
 }
 
 .tagline {
