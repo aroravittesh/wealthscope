@@ -326,17 +326,32 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
 
   private loadSnapshotById(snapshotId: string): void {
     if (!this.selectedPortfolioId || !snapshotId) return;
-    this.loading = true;
     this.errorMessage = null;
     this.warningMessage = null;
+
+    const local = this.snapshots.find(s => s.id === snapshotId);
+    if (local) {
+      this.applySummary(local.summary, this.getSelectedPortfolioName(), 0);
+      this.reportContextLabel = `Snapshot view: ${this.getSelectedPortfolioName()} · ${local.createdAt.toLocaleString()}`;
+      return;
+    }
+
+    // Fallback: refresh snapshot list and resolve the selected entry from it.
+    this.loading = true;
     this.portfolioService
-      .getPortfolioSnapshotById(this.selectedPortfolioId, snapshotId)
+      .getPortfolioSnapshots(this.selectedPortfolioId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: snapshot => {
+        next: snapshots => {
           this.loading = false;
-          this.applySummary(snapshot.summary, this.getSelectedPortfolioName(), 0);
-          this.reportContextLabel = `Snapshot view: ${this.getSelectedPortfolioName()} · ${snapshot.createdAt.toLocaleString()}`;
+          this.snapshots = [...snapshots].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+          const resolved = this.snapshots.find(s => s.id === snapshotId);
+          if (!resolved) {
+            this.errorMessage = 'Snapshot not found.';
+            return;
+          }
+          this.applySummary(resolved.summary, this.getSelectedPortfolioName(), 0);
+          this.reportContextLabel = `Snapshot view: ${this.getSelectedPortfolioName()} · ${resolved.createdAt.toLocaleString()}`;
         },
         error: err => {
           this.loading = false;
@@ -466,14 +481,14 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `wealthscope-analytics-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `aurex-analytics-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
   downloadPdf(): void {
     const lines: string[] = [];
-    lines.push('WealthScope Analytics Report');
+    lines.push('Aurex Analytics Report');
     lines.push(`Generated: ${new Date().toLocaleString()}`);
     lines.push(`Context: ${this.reportContextLabel}`);
     lines.push('');
@@ -513,7 +528,7 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
     }
     win.document.write(`
       <html>
-        <head><title>WealthScope Analytics Report</title></head>
+        <head><title>Aurex Analytics Report</title></head>
         <body style="font-family: Arial, sans-serif; padding: 24px; white-space: pre-wrap;">
 ${lines.join('\n')}
         </body>
