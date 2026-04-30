@@ -12,7 +12,7 @@
 
   <div #messagesContainer class="chatbot-messages">
     <div
-      *ngFor="let message of messages; trackBy: trackByMessage"
+      *ngFor="let message of messages; let i = index; trackBy: trackByMessage"
       class="message-row"
       [class.user]="message.sender === 'user'"
     >
@@ -28,6 +28,22 @@
           >
             {{ para }}
           </p>
+        </div>
+
+        <div
+          *ngIf="message.sender === 'bot' && message.followUps?.length && isLatestBotMessage(i)"
+          class="follow-ups"
+          aria-label="Follow-up suggestions"
+        >
+          <button
+            type="button"
+            class="follow-up-chip"
+            *ngFor="let followUp of message.followUps; trackBy: trackByFollowUp"
+            (click)="onSelectFollowUp(followUp)"
+            [disabled]="isLoading"
+          >
+            {{ followUp }}
+          </button>
         </div>
       </article>
     </div>

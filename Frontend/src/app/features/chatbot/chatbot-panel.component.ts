@@ -3,12 +3,14 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs/operators';
 import { ChatbotService } from '../../services/chatbot.service';
+import { generateFollowUpSuggestions } from './follow-up-suggestions';
 
 interface ChatMessage {
   sender: 'user' | 'bot';
   text: string;
   createdAt: Date;
   error?: boolean;
+  followUps?: string[];
 }
 
 @Component({
@@ -76,6 +78,7 @@ export class ChatbotPanelComponent implements AfterViewChecked {
     }
 
     this.requestError = '';
+    this.clearMessageFollowUps();
     this.pushMessage('user', message);
     this.draftMessage = '';
     this.isLoading = true;
@@ -88,7 +91,12 @@ export class ChatbotPanelComponent implements AfterViewChecked {
       .pipe(finalize(() => (this.isLoading = false)))
       .subscribe({
         next: (response) => {
-          this.pushMessage('bot', response.response || 'I could not generate a response yet.');
+          const botReply = response.response || 'I could not generate a response yet.';
+          const followUps = generateFollowUpSuggestions({
+            userMessage: message,
+            botMessage: botReply
+          });
+          this.pushMessage('bot', botReply, false, followUps);
         },
         error: () => {
           this.requestError = 'Unable to reach the assistant right now. Please try again.';
@@ -109,6 +117,14 @@ export class ChatbotPanelComponent implements AfterViewChecked {
     this.sendMessage();
   }
 
+  onSelectFollowUp(prompt: string): void {
+    if (this.isLoading) {
+      return;
+    }
+    this.draftMessage = prompt;
+    this.sendMessage();
+  }
+
   trackByMessage(index: number): number {
     return index;
   }
@@ -119,6 +135,19 @@ export class ChatbotPanelComponent implements AfterViewChecked {
 
   trackBySuggestedPrompt(index: number): number {
     return index;
+  }
+
+  trackByFollowUp(index: number): number {
+    return index;
+  }
+
+  isLatestBotMessage(index: number): boolean {
+    for (let i = this.messages.length - 1; i >= 0; i--) {
+      if (this.messages[i].sender === 'bot') {
+        return i === index;
+      }
+    }
+    return false;
   }
 
   /**
@@ -140,14 +169,19 @@ export class ChatbotPanelComponent implements AfterViewChecked {
     return blocks.length > 0 ? blocks : [trimmed];
   }
 
-  private pushMessage(sender: 'user' | 'bot', text: string, error = false): void {
+  private pushMessage(sender: 'user' | 'bot', text: string, error = false, followUps?: string[]): void {
     this.messages.push({
       sender,
       text,
       createdAt: new Date(),
-      error
+      error,
+      followUps
     });
     this.shouldAutoScroll = true;
+  }
+
+  private clearMessageFollowUps(): void {
+    this.messages = this.messages.map((message) => ({ ...message, followUps: undefined }));
   }
 
   private scrollToLatest(): void {
