@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -181,6 +183,7 @@ func (h *ReportingHandler) ComparePortfolioSnapshots(w http.ResponseWriter, r *h
 		ProfitLossDelta:      metricDelta(fromSummary.TotalProfitLoss, toSummary.TotalProfitLoss),
 		DiversificationDelta: metricDelta(fromSummary.DiversificationScore, toSummary.DiversificationScore),
 		VolatilityDelta:      metricDelta(fromSummary.VolatilityScore, toSummary.VolatilityScore),
+		AllocationDrift:      allocationDrift(fromSummary, toSummary),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -197,4 +200,54 @@ func metricDelta(from float64, to float64) models.SnapshotDelta {
 		Absolute: abs,
 		Percent:  pct,
 	}
+}
+
+func allocationDrift(from models.PortfolioSummary, to models.PortfolioSummary) []models.AllocationDriftRow {
+	fromMap := make(map[string]models.AssetAllocationRow, len(from.AssetAllocation))
+	for _, row := range from.AssetAllocation {
+		fromMap[row.Symbol] = row
+	}
+	toMap := make(map[string]models.AssetAllocationRow, len(to.AssetAllocation))
+	for _, row := range to.AssetAllocation {
+		toMap[row.Symbol] = row
+	}
+
+	seen := make(map[string]struct{}, len(fromMap)+len(toMap))
+	out := make([]models.AllocationDriftRow, 0, len(fromMap)+len(toMap))
+
+	for symbol, f := range fromMap {
+		t, ok := toMap[symbol]
+		if !ok {
+			t = models.AssetAllocationRow{Symbol: symbol}
+		}
+		out = append(out, models.AllocationDriftRow{
+			Symbol:       symbol,
+			FromPercent:  f.Percent,
+			ToPercent:    t.Percent,
+			DeltaPercent: t.Percent - f.Percent,
+			FromValue:    f.Value,
+			ToValue:      t.Value,
+			DeltaValue:   t.Value - f.Value,
+		})
+		seen[symbol] = struct{}{}
+	}
+	for symbol, t := range toMap {
+		if _, ok := seen[symbol]; ok {
+			continue
+		}
+		out = append(out, models.AllocationDriftRow{
+			Symbol:       symbol,
+			FromPercent:  0,
+			ToPercent:    t.Percent,
+			DeltaPercent: t.Percent,
+			FromValue:    0,
+			ToValue:      t.Value,
+			DeltaValue:   t.Value,
+		})
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		return math.Abs(out[i].DeltaPercent) > math.Abs(out[j].DeltaPercent)
+	})
+	return out
 }
