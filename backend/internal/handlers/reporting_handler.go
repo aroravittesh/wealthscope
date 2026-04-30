@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -188,6 +189,79 @@ func (h *ReportingHandler) ComparePortfolioSnapshots(w http.ResponseWriter, r *h
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// GetPortfolioSnapshotTrend returns chart-ready metrics for snapshots over time.
+// Optional query param: limit (default 20, max 200).
+func (h *ReportingHandler) GetPortfolioSnapshotTrend(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	portfolioID := mux.Vars(r)["id"]
+	if _, err := h.PortfolioService.GetPortfolioSummary(userID, portfolioID); err != nil {
+		if err.Error() == "unauthorized" {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "portfolio not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	limit := 20
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n <= 0 {
+			http.Error(w, "invalid limit", http.StatusBadRequest)
+			return
+		}
+		if n > 200 {
+			n = 200
+		}
+		limit = n
+	}
+
+	list, err := h.SnapshotRepo.ListByPortfolio(portfolioID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if len(list) > limit {
+		list = list[:limit]
+	}
+	// Repo returns desc; flip for chronological charting.
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].CreatedAt.Before(list[j].CreatedAt)
+	})
+
+	points := make([]models.PortfolioSnapshotTrendPoint, 0, len(list))
+	for _, s := range list {
+		var summary models.PortfolioSummary
+		if err := json.Unmarshal([]byte(s.SummaryJSON), &summary); err != nil {
+			http.Error(w, "invalid snapshot summary", http.StatusInternalServerError)
+			return
+		}
+		points = append(points, models.PortfolioSnapshotTrendPoint{
+			SnapshotID:          s.ID,
+			CreatedAt:           s.CreatedAt,
+			TotalPortfolioValue: summary.TotalPortfolioValue,
+			TotalInvested:       summary.TotalInvested,
+			TotalProfitLoss:     summary.TotalProfitLoss,
+			Diversification:     summary.DiversificationScore,
+			Volatility:          summary.VolatilityScore,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(models.PortfolioSnapshotTrendResponse{
+		PortfolioID: portfolioID,
+		Points:      points,
+	})
 }
 
 func metricDelta(from float64, to float64) models.SnapshotDelta {

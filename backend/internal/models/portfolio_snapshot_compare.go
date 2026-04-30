@@ -31,3 +31,18 @@ type PortfolioSnapshotCompareResponse struct {
 	VolatilityDelta      SnapshotDelta        `json:"volatility_delta"`
 	AllocationDrift      []AllocationDriftRow `json:"allocation_drift"`
 }
+
+type PortfolioSnapshotTrendPoint struct {
+	SnapshotID          string    `json:"snapshot_id"`
+	CreatedAt           time.Time `json:"created_at"`
+	TotalPortfolioValue float64   `json:"total_portfolio_value"`
+	TotalInvested       float64   `json:"total_invested"`
+	TotalProfitLoss     float64   `json:"total_profit_loss"`
+	Diversification     float64   `json:"diversification"`
+	Volatility          float64   `json:"volatility"`
+}
+
+type PortfolioSnapshotTrendResponse struct {
+	PortfolioID string                        `json:"portfolio_id"`
+	Points      []PortfolioSnapshotTrendPoint `json:"points"`
+}
