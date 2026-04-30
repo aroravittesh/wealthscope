@@ -12,6 +12,7 @@ import (
 
 // QADatasetPathOverride, when non-empty, is used instead of env and default search (tests only).
 var QADatasetPathOverride string
+var qaDatasetPathConfigured string
 
 var overrideMu sync.Mutex
 
@@ -27,6 +28,15 @@ func SetQADatasetPathForTest(path string) {
 func ClearQADatasetPathOverride() {
 	overrideMu.Lock()
 	QADatasetPathOverride = ""
+	overrideMu.Unlock()
+	ResetQALoaderForTest()
+}
+
+// SetQADatasetPath configures the primary dataset path from startup config.
+// Empty value keeps default search behavior.
+func SetQADatasetPath(path string) {
+	overrideMu.Lock()
+	qaDatasetPathConfigured = strings.TrimSpace(path)
 	overrideMu.Unlock()
 	ResetQALoaderForTest()
 }
@@ -63,7 +73,7 @@ func resolveQADatasetPath() string {
 	if o != "" {
 		return o
 	}
-	if p := strings.TrimSpace(os.Getenv("WEALTHSCOPE_QA_DATASET_PATH")); p != "" {
+	if p := strings.TrimSpace(qaDatasetPathConfigured); p != "" {
 		return p
 	}
 	candidates := []string{
@@ -166,11 +176,22 @@ func qaRowToChunk(rec []string) (KnowledgeChunk, error) {
 		tags = append(tags, strings.ToUpper(ticker))
 	}
 
+	meta := map[string]string{
+		"priority":    strings.ToLower(pri),
+		"source_type": strings.ToLower(src),
+		"difficulty":  strings.ToLower(diff),
+		"category":    category,
+	}
+	if ticker != "" {
+		meta["ticker"] = strings.ToUpper(ticker)
+	}
+
 	return KnowledgeChunk{
-		ID:      id,
-		Topic:   topic,
-		Content: content,
-		Tags:    tags,
+		ID:       id,
+		Topic:    topic,
+		Content:  content,
+		Tags:     tags,
+		Metadata: meta,
 	}, nil
 }
 
@@ -225,16 +246,9 @@ func RetrieveQAWithContext(query string, ctx RetrievalContext, topK int) []Knowl
 	}
 
 	candidates := idx.search(query, len(idx.chunks))
-	boosted := applyEntityBoost(candidates, ctx)
-	sort.Slice(boosted, func(i, j int) bool { return boosted[i].similarity > boosted[j].similarity })
-
-	best := 0.0
-	if len(boosted) > 0 {
-		best = boosted[0].similarity
-	}
-	useSemantic := len(boosted) > 0 && best >= semanticMinSimilarity
-	if useSemantic {
-		return trimChunks(boosted, topK)
+	ranked := Rerank(query, candidates, ctx, DefaultRankWeights)
+	if len(ranked) > 0 {
+		return trimRanked(ranked, topK)
 	}
 	return retrieveQALexical(query, topK, chunks)
 }

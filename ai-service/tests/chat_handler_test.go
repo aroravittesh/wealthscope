@@ -13,6 +13,13 @@ import (
 	"wealthscope-ai/internal/service"
 )
 
+type apiEnvelope struct {
+	Success bool            `json:"success"`
+	Message string          `json:"message"`
+	Data    json.RawMessage `json:"data"`
+	Error   any             `json:"error"`
+}
+
 type mockService struct {
 	reply string
 	err   error
@@ -47,8 +54,17 @@ func TestChatHandler_Success(t *testing.T) {
 		t.Fatalf("expected 200 got %d", w.Code)
 	}
 
+	var env apiEnvelope
+	if err := json.NewDecoder(w.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if !env.Success {
+		t.Fatalf("expected success envelope, got %+v", env)
+	}
 	var resp map[string]string
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.Unmarshal(env.Data, &resp); err != nil {
+		t.Fatal(err)
+	}
 	if resp["response"] != "AAPL is a technology stock." {
 		t.Fatalf("unexpected response: %s", resp["response"])
 	}
@@ -113,12 +129,12 @@ func TestClearChatHandler_Success(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200 got %d %s", w.Code, w.Body.String())
 	}
-	var resp map[string]string
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+	var env apiEnvelope
+	if err := json.Unmarshal(w.Body.Bytes(), &env); err != nil {
 		t.Fatal(err)
 	}
-	if resp["message"] == "" {
-		t.Fatalf("expected message in body: %v", resp)
+	if !env.Success || env.Message == "" {
+		t.Fatalf("expected success message in envelope: %+v", env)
 	}
 }
 
@@ -137,8 +153,14 @@ func TestChatHandler_DefaultSession(t *testing.T) {
 		t.Fatalf("expected 200 got %d", w.Code)
 	}
 
+	var env apiEnvelope
+	if err := json.NewDecoder(w.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
 	var resp map[string]string
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.Unmarshal(env.Data, &resp); err != nil {
+		t.Fatal(err)
+	}
 	if resp["session_id"] != "default" {
 		t.Fatalf("expected session_id 'default' got %s", resp["session_id"])
 	}

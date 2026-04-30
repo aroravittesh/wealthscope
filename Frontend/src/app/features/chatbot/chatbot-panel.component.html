@@ -1,6 +1,7 @@
-<section class="chatbot-panel" role="dialog" aria-label="Aurex chatbot">
+<section class="chatbot-panel" role="dialog" aria-label="Leo dashboard assistant">
   <header class="chatbot-header">
     <div>
+      <span class="chatbot-widget-label">Dashboard assistant</span>
       <h3>{{ title }}</h3>
       <p>{{ subtitle }}</p>
     </div>
@@ -11,7 +12,7 @@
 
   <div #messagesContainer class="chatbot-messages">
     <div
-      *ngFor="let message of messages; trackBy: trackByMessage"
+      *ngFor="let message of messages; let i = index; trackBy: trackByMessage"
       class="message-row"
       [class.user]="message.sender === 'user'"
     >
@@ -20,16 +21,54 @@
         [class.bot]="message.sender === 'bot'"
         [class.error]="message.error"
       >
-        {{ message.text }}
+        <div class="message-bubble__inner">
+          <p
+            *ngFor="let para of splitMessageParagraphs(message.text); trackBy: trackByParagraphIndex"
+            class="message-paragraph"
+          >
+            {{ para }}
+          </p>
+        </div>
+
+        <div
+          *ngIf="message.sender === 'bot' && message.followUps?.length && isLatestBotMessage(i)"
+          class="follow-ups"
+          aria-label="Follow-up suggestions"
+        >
+          <button
+            type="button"
+            class="follow-up-chip"
+            *ngFor="let followUp of message.followUps; trackBy: trackByFollowUp"
+            (click)="onSelectFollowUp(followUp)"
+            [disabled]="isLoading"
+          >
+            {{ followUp }}
+          </button>
+        </div>
       </article>
     </div>
 
-    <div *ngIf="isLoading" class="message-row">
+    <div *ngIf="isLoading" class="message-row message-row--bot">
       <article class="message-bubble bot loading">
-        Leo is typing...
+        <span class="message-bubble__inner message-bubble__inner--plain">Leo is typing...</span>
       </article>
     </div>
   </div>
+
+  <section *ngIf="showSuggestedPrompts" class="chatbot-suggestions" aria-label="Suggested prompts">
+    <p class="chatbot-suggestions__label">Try one of these:</p>
+    <div class="chatbot-suggestions__grid">
+      <button
+        type="button"
+        class="suggestion-chip"
+        *ngFor="let prompt of suggestedPrompts; trackBy: trackBySuggestedPrompt"
+        (click)="onSelectSuggestedPrompt(prompt)"
+        [disabled]="isLoading"
+      >
+        {{ prompt }}
+      </button>
+    </div>
+  </section>
 
   <p *ngIf="requestError" class="request-error">{{ requestError }}</p>
 

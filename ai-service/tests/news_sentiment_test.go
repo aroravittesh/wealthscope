@@ -58,8 +58,59 @@ func TestNewsSentiment_AggregateMixedBullAndBearPopulatesBothTops(t *testing.T) 
 	if r.TopPositiveArticle == "" || r.TopNegativeArticle == "" {
 		t.Fatalf("expected both top article fields set, got pos=%q neg=%q", r.TopPositiveArticle, r.TopNegativeArticle)
 	}
-	if r.OverallSentiment != string(ml.SentimentBullish) && r.OverallSentiment != string(ml.SentimentBearish) && r.OverallSentiment != string(ml.SentimentNeutral) {
+	switch r.OverallSentiment {
+	case string(ml.SentimentBullish), string(ml.SentimentBearish), string(ml.SentimentNeutral), string(ml.SentimentMixed):
+	default:
 		t.Fatalf("unexpected overall %q", r.OverallSentiment)
+	}
+}
+
+// MIXED is emitted when articles disagree strongly enough that neither side wins.
+func TestNewsSentiment_AggregateMixedClassification(t *testing.T) {
+	articles := []market.NewsItem{
+		{
+			Title:       "Apple beat estimates and raised guidance for the year",
+			Description: "Record high revenue with strong dividend increase announced",
+		},
+		{
+			Title:       "Apple missed estimates and cut guidance amid product recall",
+			Description: "Profit warning and earnings miss send shares to a record low",
+		},
+	}
+	r := newsentiment.Aggregate("AAPL", articles)
+	if r.OverallSentiment != string(ml.SentimentMixed) {
+		t.Fatalf("want MIXED for split articles, got %s (summary: %s)", r.OverallSentiment, r.Summary)
+	}
+	if r.Confidence > 0.55 {
+		t.Fatalf("MIXED confidence must be capped at 0.55, got %f", r.Confidence)
+	}
+	if r.TopPositiveArticle == "" || r.TopNegativeArticle == "" {
+		t.Fatalf("MIXED must surface both extremes, got pos=%q neg=%q", r.TopPositiveArticle, r.TopNegativeArticle)
+	}
+}
+
+// Finance-specific phrases must be honored over generic word counts.
+func TestNewsSentiment_FinancePhrasesDriveBullish(t *testing.T) {
+	articles := []market.NewsItem{
+		{Title: "Apple beat estimates", Description: "Raised guidance after blowout quarter"},
+	}
+	r := newsentiment.Aggregate("AAPL", articles)
+	if r.OverallSentiment != string(ml.SentimentBullish) {
+		t.Fatalf("want BULLISH from finance phrases, got %s", r.OverallSentiment)
+	}
+	if r.Confidence <= 0 {
+		t.Fatalf("expected confidence > 0, got %f", r.Confidence)
+	}
+}
+
+// Negation should not let an article be misclassified as bearish.
+func TestNewsSentiment_NegationDoesNotInvertSignal(t *testing.T) {
+	articles := []market.NewsItem{
+		{Title: "Analysts say no slowdown ahead, growth remains strong", Description: "Outlook robust"},
+	}
+	r := newsentiment.Aggregate("MSFT", articles)
+	if r.OverallSentiment == string(ml.SentimentBearish) {
+		t.Fatalf("negation should prevent BEARISH classification, got %s (summary: %s)", r.OverallSentiment, r.Summary)
 	}
 }
 

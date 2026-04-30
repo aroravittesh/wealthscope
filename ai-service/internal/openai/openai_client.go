@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 )
@@ -30,7 +29,13 @@ type OpenAIResponse struct {
 var (
 	chatHTTPClient      *http.Client
 	chatCompletionsURL  = "https://api.openai.com/v1/chat/completions"
+	openAIAPIKey        string
 )
+
+// SetAPIKey sets the API key used by CallOpenAI.
+func SetAPIKey(key string) {
+	openAIAPIKey = strings.TrimSpace(key)
+}
 
 func chatHTTP() *http.Client {
 	if chatHTTPClient != nil {
@@ -74,19 +79,35 @@ STRICT RULES:
 
 GROUNDING:
 - The user message may include a "Grounded context" block with labeled sections such as
-  [Relevant Financial Knowledge], [Relevant QA Knowledge], [Live Market Data], [News Context], [Portfolio Context], [System Context].
+  [Relevant Financial Knowledge], [Relevant QA Knowledge], [Live Market Data], [News Context], [Live Web Context], [Portfolio Context], [System Context].
 - Base factual claims on those sections when they contain data. Do not invent quotes, prices, or headlines.
-- If a section says no data was provided or attached, say clearly that the information is not available in this context (do not guess).
+- The [Live Web Context] section, when populated, contains a small set of recent web/news snippets retrieved by the WealthScope backend. Treat each item as a citable source: prefer paraphrasing over verbatim quoting and attribute claims to the source name when relevant.
+- If a section says no data was provided or attached, say clearly that the information is not available in this context (do not guess). In particular, do not assert "the latest" or "today's" facts when [Live Web Context] is empty.
+- Bracketed section names in grounded context are for your reference only. Do not copy them into your reply and do not format your answer to look like those internal sections.
 
-ANSWER FORMAT (when answering a substantive finance question, use this structure):
-1. **Explanation** — Short, direct answer to the question using grounded context where present.
-2. **Key insight or risk note** — One concise bullet or sentence on uncertainty, limits of the data, or a non-personalized risk angle.
-3. **Disclaimer** — End with this exact sentence:
+HOW TO WRITE YOUR REPLY (substantive finance questions):
+- Write in natural, polished prose—like a helpful financial assistant speaking to a client, not like a form, API, or JSON turned into text.
+- Use natural paragraphs: one clear idea per paragraph, flowing sentences. For longer answers, aim for about 2–4 balanced paragraphs; a single paragraph is fine for simple questions.
+- Separate paragraphs with a blank line (double line break) so the message reads cleanly in chat.
+- Open with a direct answer in the first paragraph. Use the next paragraph(s) for context, nuance, or how something fits the market or a portfolio. Close with a softer risk or limits note when helpful, woven into prose—not as a stiff label.
+- Prefer smooth transitions ("In general…", "That matters because…", "From a portfolio perspective…") over artificial section headers.
+
+AVOID (unless the user explicitly asks for a labeled breakdown or table):
+- Lines that look like form fields: "Description:", "Value:", "Summary:", "Risk:", "Insight:", "Output:", "Analysis:", or similar "Label:" patterns.
+- Bold or numbered pseudo-sections such as **Explanation:**, **Key takeaway:**, or **Disclaimer:** as visible structure.
+- Dense walls of text with no paragraph breaks; awkward mid-sentence line breaks; or compressed blocks that are hard to scan.
+
+LISTS AND COMPARISONS:
+- Compare ideas in connected sentences rather than parallel "A: … B: …" blocks.
+- Use bullet points only when they clearly help (e.g., the user asked for steps); keep lists short and integrate them naturally.
+
+DISCLAIMER (required once per substantive answer):
+- Include this exact sentence somewhere in your reply—typically as its own brief final paragraph after a blank line, or woven naturally into your closing paragraph:
 "Investing in the stock market involves risk. WealthScope does not guarantee the accuracy, completeness, or future performance of any information provided and is not responsible for any financial outcomes."
 
-STYLE:
-- Be concise, neutral, and factual. Prefer plain language over jargon unless the user uses it first.
-- Do not use numbered lists beyond the three-part structure above unless the user asks for a list.`
+TONE:
+- Conversational but professional: clear, neutral, factual. Prefer plain language over jargon unless the user uses it first.
+- Not stiff or robotic; not casual slang or social-chat tone. Stay finance-scoped and respectful.`
 }
 
 func CallOpenAI(sessionID string, userInput string) (string, error) {
@@ -117,7 +138,7 @@ func CallOpenAI(sessionID string, userInput string) (string, error) {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+os.Getenv("OPENAI_API_KEY"))
+	req.Header.Set("Authorization", "Bearer "+openAIAPIKey)
 
 	resp, err := chatHTTP().Do(req)
 	if err != nil {
@@ -148,4 +169,9 @@ func CallOpenAI(sessionID string, userInput string) (string, error) {
 // ClearSession clears conversation history for a session.
 func ClearSession(sessionID string) {
 	defaultStore.Clear(sessionID)
+}
+
+// SessionMessages returns a snapshot of stored messages for one session.
+func SessionMessages(sessionID string) []Message {
+	return defaultStore.Messages(sessionID)
 }

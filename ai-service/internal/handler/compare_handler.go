@@ -32,17 +32,16 @@ func CompareHandler(c *gin.Context) {
 func CompareHandlerWithFetcher(fetcher compare.Fetcher) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req compare.Request
-		if err := c.BindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
+		if !BindJSONOrRespond(c, &req, "Invalid JSON") {
 			return
 		}
 
 		resp, err := compare.Compare(fetcher, req.Symbols)
 		if err != nil {
-			c.JSON(HTTPStatusForCompareError(err), gin.H{"error": err.Error()})
+			RespondError(c, HTTPStatusForCompareError(err), "Request failed", err.Error())
 			return
 		}
 
-		c.JSON(http.StatusOK, resp)
+		RespondSuccess(c, http.StatusOK, "Comparison generated", resp)
 	}
 }

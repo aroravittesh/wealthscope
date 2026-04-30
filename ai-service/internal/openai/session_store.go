@@ -133,6 +133,21 @@ func (s *Store) Clear(sessionID string) {
 	delete(s.byID, sessionID)
 }
 
+// Messages returns a copy of the current session messages (oldest to newest).
+// If the session does not exist, it returns nil.
+func (s *Store) Messages(sessionID string) []Message {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.purgeExpired()
+	se, ok := s.byID[sessionID]
+	if !ok {
+		return nil
+	}
+	out := make([]Message, len(se.Messages))
+	copy(out, se.Messages)
+	return out
+}
+
 func (s *Store) maybeCompact(se *Session) {
 	max := s.cfg.MaxMessages
 	keep := s.cfg.KeepAfterCompact

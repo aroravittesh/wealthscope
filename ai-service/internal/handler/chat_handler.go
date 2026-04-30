@@ -1,43 +1,41 @@
 package handler
 
 import (
-    "net/http"
-
-    "github.com/gin-gonic/gin"
-    "wealthscope-ai/internal/openai"
-    "wealthscope-ai/internal/service"
+	"github.com/gin-gonic/gin"
+	"wealthscope-ai/internal/openai"
+	"wealthscope-ai/internal/service"
 )
 
 func ChatHandler(c *gin.Context) {
-    var body struct {
-        Message   string `json:"message"`
-        SessionID string `json:"session_id"`
-    }
+	var body struct {
+		Message   string `json:"message"`
+		SessionID string `json:"session_id"`
+	}
 
-    if err := c.BindJSON(&body); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
-        return
-    }
-    if body.Message == "" {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Message cannot be empty"})
-        return
-    }
+	if !BindJSONOrRespond(c, &body, "Invalid request") {
+		return
+	}
+	message, ok := RequiredTrimmed(c, body.Message, "Message cannot be empty")
+	if !ok {
+		return
+	}
 
-    sessionID := body.SessionID
-    if sessionID == "" {
-        sessionID = "default"
-    }
+	sessionID := NormalizeSessionID(body.SessionID)
 
-    response, err := service.ProcessMessage(sessionID, body.Message)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
+	service.LogChatRequestStart(sessionID, message)
 
-    c.JSON(http.StatusOK, gin.H{
-        "response":   response,
-        "session_id": sessionID,
-    })
+	response, err := service.ProcessMessage(sessionID, message)
+	if err != nil {
+		service.LogChatRequestFailed(sessionID, message, err)
+		RespondError(c, 500, "Request failed", err.Error())
+		return
+	}
+
+	service.LogChatRequestComplete(sessionID, message, response)
+	RespondSuccess(c, 200, "Chat response generated", gin.H{
+		"response":   response,
+		"session_id": sessionID,
+	})
 }
 
 // ChatHandlerWithService allows injecting a mock service for unit testing
@@ -48,27 +46,23 @@ func ChatHandlerWithService(svc service.ChatServiceInterface) gin.HandlerFunc {
             SessionID string `json:"session_id"`
         }
 
-        if err := c.BindJSON(&body); err != nil {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		if !BindJSONOrRespond(c, &body, "Invalid request") {
             return
         }
-        if body.Message == "" {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Message cannot be empty"})
+		message, ok := RequiredTrimmed(c, body.Message, "Message cannot be empty")
+		if !ok {
             return
         }
 
-        sessionID := body.SessionID
-        if sessionID == "" {
-            sessionID = "default"
-        }
+		sessionID := NormalizeSessionID(body.SessionID)
 
-        response, err := svc.ProcessMessage(sessionID, body.Message)
+		response, err := svc.ProcessMessage(sessionID, message)
         if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			RespondError(c, 500, "Request failed", err.Error())
             return
         }
 
-        c.JSON(http.StatusOK, gin.H{
+		RespondSuccess(c, 200, "Chat response generated", gin.H{
             "response":   response,
             "session_id": sessionID,
         })
@@ -76,11 +70,10 @@ func ChatHandlerWithService(svc service.ChatServiceInterface) gin.HandlerFunc {
 }
 
 func ClearChatHandler(c *gin.Context) {
-    sessionID := c.Param("session_id")
-    if sessionID == "" {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "session_id required"})
-        return
-    }
-    openai.ClearSession(sessionID)
-    c.JSON(http.StatusOK, gin.H{"message": "Session cleared"})
+	sessionID, ok := RequirePathParam(c, "session_id", "session_id required")
+	if !ok {
+		return
+	}
+	openai.ClearSession(sessionID)
+	RespondSuccess(c, 200, "Session cleared", gin.H{"session_id": sessionID})
 }

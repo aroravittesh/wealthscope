@@ -11,7 +11,6 @@ import { ChatbotPanelComponent } from './chatbot-panel.component';
 })
 export class ChatbotLauncherComponent {
   isOpen = false;
-  iconLoadFailed = false;
 
   toggleChat(): void {
     this.isOpen = !this.isOpen;
@@ -19,9 +18,5 @@ export class ChatbotLauncherComponent {
 
   closeChat(): void {
     this.isOpen = false;
-  }
-
-  onIconError(): void {
-    this.iconLoadFailed = true;
   }
 }

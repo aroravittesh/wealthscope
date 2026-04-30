@@ -10,15 +10,14 @@ import (
 // PortfolioExplainHandler handles POST /portfolio/explain.
 func PortfolioExplainHandler(c *gin.Context) {
 	var req portfolioexplain.Request
-	if err := c.BindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
+	if !BindJSONOrRespond(c, &req, "Invalid JSON") {
 		return
 	}
 
 	resp, err := portfolioexplain.Explain(req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondBadRequest(c, "Request failed", err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	RespondSuccess(c, http.StatusOK, "Portfolio explanation generated", resp)
 }

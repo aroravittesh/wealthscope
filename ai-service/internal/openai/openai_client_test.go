@@ -8,7 +8,7 @@ import (
 )
 
 func TestCallOpenAI_Success(t *testing.T) {
-	t.Setenv("OPENAI_API_KEY", "sk-test")
+	SetAPIKey("sk-test")
 
 	prev := defaultStore
 	t.Cleanup(func() { defaultStore = prev })
@@ -40,7 +40,7 @@ func TestCallOpenAI_Success(t *testing.T) {
 }
 
 func TestCallOpenAI_NonOKStatus(t *testing.T) {
-	t.Setenv("OPENAI_API_KEY", "sk-test")
+	SetAPIKey("sk-test")
 
 	prev := defaultStore
 	t.Cleanup(func() { defaultStore = prev })
@@ -62,7 +62,7 @@ func TestCallOpenAI_NonOKStatus(t *testing.T) {
 }
 
 func TestCallOpenAI_EmptyChoices(t *testing.T) {
-	t.Setenv("OPENAI_API_KEY", "sk-test")
+	SetAPIKey("sk-test")
 
 	prev := defaultStore
 	t.Cleanup(func() { defaultStore = prev })
@@ -85,7 +85,7 @@ func TestCallOpenAI_EmptyChoices(t *testing.T) {
 }
 
 func TestCallOpenAI_InvalidJSONBody(t *testing.T) {
-	t.Setenv("OPENAI_API_KEY", "sk-test")
+	SetAPIKey("sk-test")
 
 	prev := defaultStore
 	t.Cleanup(func() { defaultStore = prev })

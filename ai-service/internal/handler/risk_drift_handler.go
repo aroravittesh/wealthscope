@@ -9,19 +9,17 @@ import (
 
 func RiskDriftHandler(c *gin.Context) {
 	var req prediction.DriftRequest
-	if err := c.BindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+	if !BindJSONOrRespond(c, &req, "Invalid request") {
 		return
 	}
-	if len(req.Holdings) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "holdings required"})
+	if !RequireNonEmptySlice(c, req.Holdings, "holdings required") {
 		return
 	}
 
 	resp, err := prediction.PredictRiskDrift(req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		RespondBadRequest(c, "Request failed", err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	RespondSuccess(c, http.StatusOK, "Risk drift prediction generated", resp)
 }
