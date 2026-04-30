@@ -167,6 +167,39 @@ import { Portfolio, PortfolioSnapshot, PortfolioSnapshotCompareResponse, Portfol
         </div>
       </div>
 
+      <div *ngIf="snapshotCompare && topAllocationDriftRows.length > 0" class="bg-slate-800/70 rounded-xl p-6 border border-slate-700 mb-8">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold text-white">Allocation Drift Insights</h2>
+          <p class="text-xs text-slate-400">Top movers by weight change</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead class="bg-slate-800 text-slate-300">
+              <tr>
+                <th class="text-left p-3">Symbol</th>
+                <th class="text-left p-3">Then %</th>
+                <th class="text-left p-3">Now %</th>
+                <th class="text-left p-3">Drift %</th>
+                <th class="text-left p-3">Value Change</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of topAllocationDriftRows" class="border-t border-slate-700">
+                <td class="p-3 text-slate-100 font-medium">{{ row.symbol }}</td>
+                <td class="p-3 text-slate-300">{{ row.fromPercent.toFixed(2) }}%</td>
+                <td class="p-3 text-slate-300">{{ row.toPercent.toFixed(2) }}%</td>
+                <td class="p-3 font-semibold" [ngClass]="deltaClass(row.deltaPercent)">
+                  {{ signedPercent(row.deltaPercent) }}
+                </td>
+                <td class="p-3 font-semibold" [ngClass]="deltaClass(row.deltaValue)">
+                  {{ signedCurrency(row.deltaValue) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div *ngIf="snapshotTrendPoints.length > 0" class="bg-slate-800/70 rounded-xl p-6 border border-slate-700 mb-8">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-xl font-semibold text-white">Snapshot Trend (Total Value)</h2>
@@ -463,6 +496,7 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
 
   runSnapshotCompare(): void {
     if (!this.canRunCompare || !this.selectedPortfolioId) {
+      this.errorMessage = 'Please select two different snapshots to compare.';
       return;
     }
     this.compareLoading = true;
@@ -475,6 +509,7 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
         next: compare => {
           this.compareLoading = false;
           this.snapshotCompare = compare;
+          this.warningMessage = null;
         },
         error: err => {
           this.compareLoading = false;
@@ -668,6 +703,15 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
   get snapshotTrendEndLabel(): string {
     if (!this.snapshotTrendPoints.length) return '';
     return this.snapshotTrendPoints[this.snapshotTrendPoints.length - 1].createdAt.toLocaleDateString();
+  }
+
+  get topAllocationDriftRows() {
+    if (!this.snapshotCompare?.allocationDrift?.length) {
+      return [];
+    }
+    return [...this.snapshotCompare.allocationDrift]
+      .sort((a, b) => Math.abs(b.deltaPercent) - Math.abs(a.deltaPercent))
+      .slice(0, 6);
   }
 
   ngOnDestroy(): void {
