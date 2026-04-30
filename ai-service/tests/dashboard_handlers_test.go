@@ -15,6 +15,27 @@ import (
 	"wealthscope-ai/internal/prediction"
 )
 
+type envelope struct {
+	Success bool            `json:"success"`
+	Message string          `json:"message"`
+	Data    json.RawMessage `json:"data"`
+	Error   any             `json:"error"`
+}
+
+func decodeEnvelopeData(t *testing.T, body []byte, out any) {
+	t.Helper()
+	var env envelope
+	if err := json.Unmarshal(body, &env); err != nil {
+		t.Fatal(err)
+	}
+	if !env.Success {
+		t.Fatalf("expected success envelope, got %+v", env)
+	}
+	if err := json.Unmarshal(env.Data, out); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func dashboardRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -43,9 +64,7 @@ func TestHTTP_PortfolioSummarize_OK(t *testing.T) {
 		t.Fatalf("status %d body %s", w.Code, w.Body.String())
 	}
 	var out map[string]any
-	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
-		t.Fatal(err)
-	}
+	decodeEnvelopeData(t, w.Body.Bytes(), &out)
 	if _, ok := out["summary"]; !ok {
 		t.Fatalf("missing summary: %v", out)
 	}
@@ -80,7 +99,7 @@ func TestHTTP_PortfolioChanges_NoPrior(t *testing.T) {
 	var out struct {
 		HasPriorSnapshot bool `json:"has_prior_snapshot"`
 	}
-	json.Unmarshal(w.Body.Bytes(), &out)
+	decodeEnvelopeData(t, w.Body.Bytes(), &out)
 	if out.HasPriorSnapshot {
 		t.Fatal("expected false")
 	}
@@ -111,7 +130,7 @@ func TestHTTP_PortfolioChanges_WithPrior(t *testing.T) {
 	var out struct {
 		HasPriorSnapshot bool `json:"has_prior_snapshot"`
 	}
-	json.Unmarshal(w.Body.Bytes(), &out)
+	decodeEnvelopeData(t, w.Body.Bytes(), &out)
 	if !out.HasPriorSnapshot {
 		t.Fatal("expected prior comparison")
 	}
@@ -186,9 +205,7 @@ func TestHTTP_Compare_OK_WithMockFetcher(t *testing.T) {
 		} `json:"comparisons"`
 		Summary string `json:"summary"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
-		t.Fatal(err)
-	}
+	decodeEnvelopeData(t, w.Body.Bytes(), &out)
 	if len(out.Comparisons) != 2 || out.Summary == "" {
 		t.Fatalf("unexpected body: %+v", out)
 	}
@@ -262,9 +279,7 @@ func TestHTTP_NewsSentiment_OK_WithMockFetcher(t *testing.T) {
 		ArticleCount     int     `json:"article_count"`
 		Confidence       float64 `json:"confidence"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
-		t.Fatal(err)
-	}
+	decodeEnvelopeData(t, w.Body.Bytes(), &out)
 	if out.Symbol != "TSLA" || out.ArticleCount != 1 {
 		t.Fatalf("unexpected %+v", out)
 	}
@@ -324,9 +339,7 @@ func TestHTTP_RiskDrift_OK(t *testing.T) {
 		t.Fatalf("status %d %s", w.Code, w.Body.String())
 	}
 	var out prediction.DriftResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
-		t.Fatal(err)
-	}
+	decodeEnvelopeData(t, w.Body.Bytes(), &out)
 	if out.DriftLevel == "" {
 		t.Fatal("expected drift_level")
 	}

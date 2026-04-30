@@ -15,6 +15,27 @@ import (
 	"wealthscope-ai/internal/handler"
 )
 
+type feedbackEnvelope struct {
+	Success bool            `json:"success"`
+	Message string          `json:"message"`
+	Data    json.RawMessage `json:"data"`
+	Error   any             `json:"error"`
+}
+
+func decodeFeedbackEnvelopeData(t *testing.T, body []byte, out any) feedbackEnvelope {
+	t.Helper()
+	var env feedbackEnvelope
+	if err := json.Unmarshal(body, &env); err != nil {
+		t.Fatal(err)
+	}
+	if out != nil {
+		if err := json.Unmarshal(env.Data, out); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return env
+}
+
 // errorStore returns an unexpected error from Append, simulating disk failure.
 type errorStore struct{ feedback.MemoryStore }
 
@@ -63,8 +84,9 @@ func TestFeedbackHandler_RecordValid(t *testing.T) {
 		Ok bool   `json:"ok"`
 		ID string `json:"id"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatal(err)
+	env := decodeFeedbackEnvelopeData(t, w.Body.Bytes(), &resp)
+	if !env.Success {
+		t.Fatalf("expected success envelope, got %+v", env)
 	}
 	if !resp.Ok || resp.ID == "" {
 		t.Fatalf("expected ok+id, got %+v", resp)
@@ -141,7 +163,10 @@ func TestFeedbackHandler_ListFiltersAndLimit(t *testing.T) {
 		Count int                 `json:"count"`
 		Items []feedback.Feedback `json:"items"`
 	}
-	json.Unmarshal(w.Body.Bytes(), &got)
+	env := decodeFeedbackEnvelopeData(t, w.Body.Bytes(), &got)
+	if !env.Success {
+		t.Fatalf("expected success envelope, got %+v", env)
+	}
 	if got.Count != 2 {
 		t.Fatalf("expected 2 chat records, got %d", got.Count)
 	}
@@ -149,7 +174,7 @@ func TestFeedbackHandler_ListFiltersAndLimit(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/feedback?feedback=poor_retrieval", nil)
 	r.ServeHTTP(w, req)
-	json.Unmarshal(w.Body.Bytes(), &got)
+	decodeFeedbackEnvelopeData(t, w.Body.Bytes(), &got)
 	if got.Count != 1 || got.Items[0].SessionID != "b" {
 		t.Fatalf("filter by label failed: %+v", got)
 	}
@@ -157,7 +182,7 @@ func TestFeedbackHandler_ListFiltersAndLimit(t *testing.T) {
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/feedback?limit=1", nil)
 	r.ServeHTTP(w, req)
-	json.Unmarshal(w.Body.Bytes(), &got)
+	decodeFeedbackEnvelopeData(t, w.Body.Bytes(), &got)
 	if len(got.Items) != 1 {
 		t.Fatalf("limit=1 ignored: %d", len(got.Items))
 	}

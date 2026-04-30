@@ -18,18 +18,18 @@ func NewsSentimentHandlerWithFetcher(fetcher newsentiment.NewsFetcher) gin.Handl
 	return func(c *gin.Context) {
 		raw := strings.TrimSpace(c.Param("symbol"))
 		if raw == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "symbol required"})
+			RespondBadRequest(c, "Request failed", "symbol required")
 			return
 		}
 		symbol := strings.ToUpper(raw)
 
 		articles, err := fetcher.FetchNews(symbol)
 		if err != nil {
-			c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+			RespondError(c, http.StatusBadGateway, "Request failed", err.Error())
 			return
 		}
 
 		resp := newsentiment.Aggregate(symbol, articles)
-		c.JSON(http.StatusOK, resp)
+		RespondSuccess(c, http.StatusOK, "News sentiment generated", resp)
 	}
 }

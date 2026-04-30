@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net/http"
 	"os"
 
 	"wealthscope-ai/internal/handler"
@@ -33,9 +32,9 @@ func main() {
 
     // Health check
     router.GET("/health", func(c *gin.Context) {
-        c.JSON(200, gin.H{
-            "status": "AI Service running",
-        })
+            handler.RespondSuccess(c, 200, "AI Service running", gin.H{
+                "status": "AI Service running",
+            })
     })
 
     // Chat endpoint
@@ -62,11 +61,11 @@ func main() {
             Holdings []ml.PortfolioHolding `json:"holdings"`
         }
         if err := c.BindJSON(&body); err != nil {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+            handler.RespondBadRequest(c, "Request failed", "Invalid request")
             return
         }
         report := ml.ScorePortfolio(body.Holdings)
-        c.JSON(http.StatusOK, report)
+        handler.RespondSuccess(c, 200, "Risk score generated", report)
     })
 
     // Stock quote endpoint
@@ -74,10 +73,10 @@ func main() {
         symbol := c.Param("symbol")
         quote, err := market.GetStockQuote(symbol)
         if err != nil {
-            c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+            handler.RespondError(c, 404, "Request failed", err.Error())
             return
         }
-        c.JSON(http.StatusOK, quote)
+        handler.RespondSuccess(c, 200, "Stock quote retrieved", quote)
     })
 
     // Company overview endpoint
@@ -85,24 +84,24 @@ func main() {
         symbol := c.Param("symbol")
         overview, err := market.GetCompanyOverview(symbol)
         if err != nil {
-            c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+            handler.RespondError(c, 404, "Request failed", err.Error())
             return
         }
-        c.JSON(http.StatusOK, overview)
+        handler.RespondSuccess(c, 200, "Company overview retrieved", overview)
     })
 // News endpoint
 router.GET("/news/:symbol", func(c *gin.Context) {
     symbol := c.Param("symbol")
     news, err := market.GetMarketNews(symbol)
     if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        handler.RespondError(c, 500, "Request failed", err.Error())
         return
     }
     if len(news) == 0 {
-        c.JSON(http.StatusNotFound, gin.H{"error": "No news found for " + symbol})
+        handler.RespondError(c, 404, "Request failed", "No news found for "+symbol)
         return
     }
-    c.JSON(http.StatusOK, gin.H{"symbol": symbol, "news": news})
+    handler.RespondSuccess(c, 200, "Market news retrieved", gin.H{"symbol": symbol, "news": news})
 })
 
 // Clear session endpoint
@@ -113,15 +112,15 @@ router.DELETE("/chat/session/:session_id", handler.ClearChatHandler)
             Text string `json:"text"`
         }
         if err := c.BindJSON(&body); err != nil {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+            handler.RespondBadRequest(c, "Request failed", "Invalid request")
             return
         }
         if body.Text == "" {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Text cannot be empty"})
+            handler.RespondBadRequest(c, "Request failed", "Text cannot be empty")
             return
         }
         sentiment := ml.AnalyzeSentiment(body.Text)
-        c.JSON(http.StatusOK, gin.H{"sentiment": sentiment})
+        handler.RespondSuccess(c, 200, "Sentiment generated", gin.H{"sentiment": sentiment})
     })
 
     // Intent detection endpoint
@@ -130,15 +129,15 @@ router.DELETE("/chat/session/:session_id", handler.ClearChatHandler)
             Message string `json:"message"`
         }
         if err := c.BindJSON(&body); err != nil {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+            handler.RespondBadRequest(c, "Request failed", "Invalid request")
             return
         }
         if body.Message == "" {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Message cannot be empty"})
+            handler.RespondBadRequest(c, "Request failed", "Message cannot be empty")
             return
         }
         result := ml.DetectIntent(body.Message)
-        c.JSON(http.StatusOK, result)
+        handler.RespondSuccess(c, 200, "Intent detected", result)
     })
 
     port := os.Getenv("PORT")

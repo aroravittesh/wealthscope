@@ -25,7 +25,7 @@ func RecordFeedbackHandlerWithStore(store feedback.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var body feedback.Feedback
 		if err := c.BindJSON(&body); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+			RespondBadRequest(c, "Request failed", "invalid JSON")
 			return
 		}
 		// Server controls these regardless of what the client sent.
@@ -34,10 +34,10 @@ func RecordFeedbackHandlerWithStore(store feedback.Store) gin.HandlerFunc {
 
 		saved, err := store.Append(body)
 		if err != nil {
-			c.JSON(httpStatusForFeedbackError(err), gin.H{"error": err.Error()})
+			RespondError(c, httpStatusForFeedbackError(err), "Request failed", err.Error())
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{
+		RespondSuccess(c, http.StatusOK, "Feedback recorded", gin.H{
 			"ok":        true,
 			"id":        saved.ID,
 			"timestamp": saved.Timestamp,
@@ -62,7 +62,7 @@ func ListFeedbackHandlerWithStore(store feedback.Store) gin.HandlerFunc {
 		if since := strings.TrimSpace(c.Query("since")); since != "" {
 			t, err := time.Parse(time.RFC3339, since)
 			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "since must be RFC3339"})
+				RespondBadRequest(c, "Request failed", "since must be RFC3339")
 				return
 			}
 			filter.Since = t
@@ -70,10 +70,10 @@ func ListFeedbackHandlerWithStore(store feedback.Store) gin.HandlerFunc {
 
 		items, err := store.List(filter)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Request failed", err.Error())
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{
+		RespondSuccess(c, http.StatusOK, "Feedback list retrieved", gin.H{
 			"count": len(items),
 			"items": items,
 		})
@@ -91,7 +91,7 @@ func ExportFeedbackHandlerWithStore(store feedback.Store) gin.HandlerFunc {
 		c.Header("Content-Type", "application/x-ndjson")
 		c.Header("Content-Disposition", `attachment; filename="feedback.jsonl"`)
 		if err := store.Export(c.Writer); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			RespondError(c, http.StatusInternalServerError, "Request failed", err.Error())
 			return
 		}
 	}
