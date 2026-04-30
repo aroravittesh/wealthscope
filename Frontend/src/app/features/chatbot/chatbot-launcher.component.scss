@@ -1,13 +1,19 @@
 /* Embedded assistant widget — CSS Leo character + callout; panel anchored above page footer strip */
 
 :host {
+  position: fixed;
+  right: clamp(1rem, 2.8vw, 2rem);
+  bottom: calc(1.1rem + env(safe-area-inset-bottom, 0px));
+  z-index: 1395;
   display: block;
   width: fit-content;
-  max-width: 100%;
+  max-width: min(100vw - 2rem, 28rem);
+  pointer-events: none;
 }
 
 .leo-assistant-root {
   position: relative;
+  pointer-events: auto;
 }
 
 .leo-assistant-backdrop {
@@ -34,7 +40,7 @@
   position: fixed;
   z-index: 1410;
   right: clamp(1rem, 4vw, 2rem);
-  bottom: calc(6.75rem + env(safe-area-inset-bottom, 0px));
+  bottom: calc(5.6rem + env(safe-area-inset-bottom, 0px));
   width: min(400px, calc(100vw - 2rem));
   max-height: min(560px, calc(100vh - 8.5rem - env(safe-area-inset-bottom, 0px)));
   display: flex;
@@ -334,6 +340,12 @@
 }
 
 @media (max-width: 640px) {
+  :host {
+    right: 0.75rem;
+    bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px));
+    max-width: calc(100vw - 1.5rem);
+  }
+
   .leo-assistant-widget {
     flex-direction: column;
     align-items: stretch;
@@ -352,7 +364,7 @@
 
   .leo-assistant-panel-layer {
     right: 0.75rem;
-    bottom: calc(7.25rem + env(safe-area-inset-bottom, 0px));
+    bottom: calc(5.2rem + env(safe-area-inset-bottom, 0px));
     width: calc(100vw - 1.5rem);
     max-height: min(520px, calc(100vh - 9rem));
   }
