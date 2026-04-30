@@ -97,6 +97,35 @@ export interface PortfolioSnapshot {
   summary: PortfolioSummary;
 }
 
+export interface SnapshotDelta {
+  absolute: number;
+  percent: number;
+}
+
+export interface AllocationDriftRow {
+  symbol: string;
+  fromPercent: number;
+  toPercent: number;
+  deltaPercent: number;
+  fromValue: number;
+  toValue: number;
+  deltaValue: number;
+}
+
+export interface PortfolioSnapshotCompareResponse {
+  portfolioId: string;
+  fromId: string;
+  toId: string;
+  fromAt: Date;
+  toAt: Date;
+  totalValueDelta: SnapshotDelta;
+  totalInvestedDelta: SnapshotDelta;
+  profitLossDelta: SnapshotDelta;
+  diversificationDelta: SnapshotDelta;
+  volatilityDelta: SnapshotDelta;
+  allocationDrift: AllocationDriftRow[];
+}
+
 export interface ChartData {
   labels: string[];
   datasets: {
