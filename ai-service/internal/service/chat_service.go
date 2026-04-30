@@ -75,18 +75,82 @@ func (s *chatService) ProcessMessage(sessionID string, message string) (string, 
 	return ProcessMessage(sessionID, message)
 }
 
+type webSearchTrace struct {
+	DecisionUse  bool
+	DecisionWhy  string
+	ProviderName string
+	RawCount     int
+	CleanedCount int
+	Fallback     bool
+	FallbackWhy  string
+}
+
+type chatPipelineTrace struct {
+	EntityPrimary     string
+	EntitySecondaryN  int
+	EntityCompaniesN  int
+	Intent            string
+	IntentConfidence  float64
+	IntentSource      string
+	IntentFallback    bool
+	RAGResults        int
+	RAGUsed           bool
+	QAResults         int
+	QAUsed            bool
+	WebUsed           bool
+	WebResults        int
+	WebFallback       bool
+	WebDecisionReason string
+	WebFallbackReason string
+}
+
 func ProcessMessage(sessionID string, message string) (string, error) {
-	in := BuildEnvelopeInputForChat(message)
+	start := time.Now()
+	in, trace := buildEnvelopeInputForChat(message)
+	logChatPipelineEnrichment(sessionID, message, trace)
+
 	enriched := chatprompt.BuildUserContent(in)
-	return openai.CallOpenAI(sessionID, enriched)
+	response, err := openai.CallOpenAI(sessionID, enriched)
+	elapsed := time.Since(start).Milliseconds()
+	if err != nil {
+		logChatEvent("chat_pipeline_failed",
+			"session_id", sessionID,
+			"message_preview", messagePreview(message),
+			"elapsed_ms", elapsed,
+			"error", err,
+		)
+		return "", err
+	}
+	logChatEvent("chat_pipeline_complete",
+		"session_id", sessionID,
+		"message_preview", messagePreview(message),
+		"elapsed_ms", elapsed,
+		"response_chars", len(response),
+	)
+	return response, nil
 }
 
 // BuildEnvelopeInputForChat runs retrieval, optional live market enrichment, and intent/sentiment metadata.
 // Exposed for tests (no OpenAI call).
 func BuildEnvelopeInputForChat(message string) chatprompt.EnvelopeInput {
+	in, _ := buildEnvelopeInputForChat(message)
+	return in
+}
+
+func buildEnvelopeInputForChat(message string) (chatprompt.EnvelopeInput, chatPipelineTrace) {
 	ent := entity.Extract(message)
 	intentResult := ml.DetectIntent(message)
 	sentiment := ml.AnalyzeSentiment(message)
+	trace := chatPipelineTrace{
+		EntityPrimary:    ent.PrimaryTicker,
+		EntitySecondaryN: len(ent.SecondaryTickers),
+		EntityCompaniesN: len(ent.CompanyMatches),
+		Intent:           string(intentResult.Intent),
+		IntentConfidence: intentResult.Confidence,
+		IntentSource:     intentResult.Source,
+		IntentFallback: intentResult.Source == ml.IntentSourceRemoteFallback ||
+			intentResult.Source == ml.IntentSourceLowConfFallback,
+	}
 
 	var knowledgeLines []string
 	var qaKnowledgeLines []string
@@ -96,12 +160,16 @@ func BuildEnvelopeInputForChat(message string) chatprompt.EnvelopeInput {
 		knowledgeLines = append(knowledgeLines,
 			fmt.Sprintf("[%s] %s", ch.Topic, strings.TrimSpace(ch.Content)))
 	}
+	trace.RAGResults = len(chunks)
+	trace.RAGUsed = len(chunks) > 0
 
 	qaChunks := rag.RetrieveQAWithContext(message, rctx, 3)
 	for _, ch := range qaChunks {
 		q, a := rag.ChunkQAPair(ch)
 		qaKnowledgeLines = append(qaKnowledgeLines, rag.FormatQAKnowledgeLine(ch, q, a))
 	}
+	trace.QAResults = len(qaChunks)
+	trace.QAUsed = len(qaChunks) > 0
 
 	var liveMarket strings.Builder
 	var newsBody strings.Builder
@@ -139,7 +207,12 @@ func BuildEnvelopeInputForChat(message string) chatprompt.EnvelopeInput {
 		}
 	}
 
-	webBody := buildWebContextBody(message, string(intentResult.Intent), ent)
+	webBody, webTrace := buildWebContextBody(message, string(intentResult.Intent), ent)
+	trace.WebUsed = webTrace.CleanedCount > 0
+	trace.WebResults = webTrace.CleanedCount
+	trace.WebFallback = webTrace.Fallback
+	trace.WebDecisionReason = webTrace.DecisionWhy
+	trace.WebFallbackReason = webTrace.FallbackWhy
 
 	return chatprompt.EnvelopeInput{
 		UserMessage:      message,
@@ -153,22 +226,29 @@ func BuildEnvelopeInputForChat(message string) chatprompt.EnvelopeInput {
 		Ticker:           intentResult.Ticker,
 		Sentiment:        string(sentiment),
 		IntentConfidence: intentResult.Confidence,
-	}
+	}, trace
 }
 
 // buildWebContextBody runs the live web search step. It is fully optional and
 // degrades silently: if the decision says no, the provider is unconfigured,
 // the call errors, or the cleaner drops every hit, this returns "" and the
 // envelope renders the standard "no live web search results" note.
-func buildWebContextBody(message, intent string, ent entity.EntityResult) string {
+func buildWebContextBody(message, intent string, ent entity.EntityResult) (string, webSearchTrace) {
 	decision := websearch.Decide(message, intent, ent)
+	trace := webSearchTrace{
+		DecisionUse: decision.Use,
+		DecisionWhy: decision.Reason,
+	}
 	if !decision.Use {
-		return ""
+		return "", trace
 	}
 	provider := websearch.DefaultProvider()
 	if provider == nil {
-		return ""
+		trace.Fallback = true
+		trace.FallbackWhy = "provider_nil"
+		return "", trace
 	}
+	trace.ProviderName = provider.Name()
 	ctx, cancel := context.WithTimeout(context.Background(), webSearchTimeout)
 	defer cancel()
 	raw, err := provider.Search(ctx, decision.Query, 5)
@@ -176,13 +256,19 @@ func buildWebContextBody(message, intent string, ent entity.EntityResult) string
 		// Intentional silent fallback: chat must never break on a flaky
 		// upstream search provider. Operators can correlate via the provider
 		// logs; the prompt will state "no live web search results".
-		return ""
+		trace.Fallback = true
+		trace.FallbackWhy = "provider_error"
+		return "", trace
 	}
+	trace.RawCount = len(raw)
 	cleaned := websearch.CleanAndRank(raw, webSearchTopK)
+	trace.CleanedCount = len(cleaned)
 	if len(cleaned) == 0 {
-		return ""
+		trace.Fallback = true
+		trace.FallbackWhy = "no_usable_results"
+		return "", trace
 	}
-	return websearch.FormatForPrompt(cleaned)
+	return websearch.FormatForPrompt(cleaned), trace
 }
 
 func shouldEnrichMarket(intent ml.Intent, ticker string) bool {
@@ -207,4 +293,27 @@ func truncateRunes(s string, max int) string {
 		return s
 	}
 	return string(r[:max]) + "…"
+}
+
+func logChatPipelineEnrichment(sessionID, message string, t chatPipelineTrace) {
+	logChatEvent("chat_pipeline_enrichment",
+		"session_id", sessionID,
+		"message_preview", messagePreview(message),
+		"intent", t.Intent,
+		"intent_confidence", fmt.Sprintf("%.2f", t.IntentConfidence),
+		"intent_source", t.IntentSource,
+		"intent_fallback", t.IntentFallback,
+		"entity_primary_ticker", t.EntityPrimary,
+		"entity_secondary_count", t.EntitySecondaryN,
+		"entity_company_count", t.EntityCompaniesN,
+		"rag_used", t.RAGUsed,
+		"rag_results", t.RAGResults,
+		"qa_used", t.QAUsed,
+		"qa_results", t.QAResults,
+		"web_used", t.WebUsed,
+		"web_results", t.WebResults,
+		"web_decision_reason", t.WebDecisionReason,
+		"web_fallback", t.WebFallback,
+		"web_fallback_reason", t.WebFallbackReason,
+	)
 }
