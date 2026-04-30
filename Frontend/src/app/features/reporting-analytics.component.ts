@@ -5,7 +5,7 @@ import { RouterModule } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortfolioService } from '../services/portfolio.service';
-import { Portfolio, PortfolioSnapshot, PortfolioSummary } from '../models';
+import { Portfolio, PortfolioSnapshot, PortfolioSnapshotCompareResponse, PortfolioSummary } from '../models';
 
 @Component({
   selector: 'app-reporting-analytics',
@@ -86,6 +86,84 @@ import { Portfolio, PortfolioSnapshot, PortfolioSummary } from '../models';
           >
             Refresh Live
           </button>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/70 rounded-xl p-4 border border-slate-700 mb-6 grid grid-cols-1 lg:grid-cols-4 gap-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Then (from snapshot)</label>
+          <select
+            [(ngModel)]="compareFromSnapshotId"
+            class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-slate-200"
+            [disabled]="compareLoading || snapshots.length < 2"
+          >
+            <option value="" disabled>Select older snapshot</option>
+            <option *ngFor="let s of snapshots" [value]="s.id">{{ s.createdAt | date:'medium' }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Now (to snapshot)</label>
+          <select
+            [(ngModel)]="compareToSnapshotId"
+            class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-slate-200"
+            [disabled]="compareLoading || snapshots.length < 2"
+          >
+            <option value="" disabled>Select newer snapshot</option>
+            <option *ngFor="let s of snapshots" [value]="s.id">{{ s.createdAt | date:'medium' }}</option>
+          </select>
+        </div>
+        <div class="flex items-end">
+          <button
+            type="button"
+            (click)="runSnapshotCompare()"
+            class="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold px-4 py-2 rounded-lg transition w-full"
+            [disabled]="compareLoading || !canRunCompare"
+          >
+            {{ compareLoading ? 'Comparing...' : 'Compare Snapshots' }}
+          </button>
+        </div>
+        <div class="flex items-end text-xs text-slate-400">
+          <span *ngIf="snapshots.length < 2">Save at least 2 snapshots to compare progression.</span>
+          <span *ngIf="snapshots.length >= 2 && snapshotCompare">Then: {{ snapshotCompare.fromAt | date:'short' }} → Now: {{ snapshotCompare.toAt | date:'short' }}</span>
+        </div>
+      </div>
+
+      <div *ngIf="snapshotCompare" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+        <div class="bg-slate-800/70 rounded-xl p-5 border border-slate-700">
+          <p class="text-slate-400 text-xs uppercase tracking-wide">Value Change</p>
+          <p class="mt-2 text-xl font-bold" [ngClass]="deltaClass(snapshotCompare.totalValueDelta.absolute)">
+            {{ signedCurrency(snapshotCompare.totalValueDelta.absolute) }}
+          </p>
+          <p class="text-xs mt-1" [ngClass]="deltaClass(snapshotCompare.totalValueDelta.percent)">
+            {{ signedPercent(snapshotCompare.totalValueDelta.percent) }}
+          </p>
+        </div>
+        <div class="bg-slate-800/70 rounded-xl p-5 border border-slate-700">
+          <p class="text-slate-400 text-xs uppercase tracking-wide">P/L Change</p>
+          <p class="mt-2 text-xl font-bold" [ngClass]="deltaClass(snapshotCompare.profitLossDelta.absolute)">
+            {{ signedCurrency(snapshotCompare.profitLossDelta.absolute) }}
+          </p>
+          <p class="text-xs mt-1" [ngClass]="deltaClass(snapshotCompare.profitLossDelta.percent)">
+            {{ signedPercent(snapshotCompare.profitLossDelta.percent) }}
+          </p>
+        </div>
+        <div class="bg-slate-800/70 rounded-xl p-5 border border-slate-700">
+          <p class="text-slate-400 text-xs uppercase tracking-wide">Diversification</p>
+          <p class="mt-2 text-xl font-bold" [ngClass]="deltaClass(snapshotCompare.diversificationDelta.absolute)">
+            {{ signedNumber(snapshotCompare.diversificationDelta.absolute) }}
+          </p>
+          <p class="text-xs mt-1" [ngClass]="deltaClass(snapshotCompare.diversificationDelta.percent)">
+            {{ signedPercent(snapshotCompare.diversificationDelta.percent) }}
+          </p>
+        </div>
+        <div class="bg-slate-800/70 rounded-xl p-5 border border-slate-700">
+          <p class="text-slate-400 text-xs uppercase tracking-wide">Volatility</p>
+          <p class="mt-2 text-xl font-bold" [ngClass]="deltaClass(snapshotCompare.volatilityDelta.absolute)">
+            {{ signedNumber(snapshotCompare.volatilityDelta.absolute) }}
+          </p>
+          <p class="text-xs mt-1" [ngClass]="deltaClass(snapshotCompare.volatilityDelta.percent)">
+            {{ signedPercent(snapshotCompare.volatilityDelta.percent) }}
+          </p>
         </div>
       </div>
 
@@ -208,7 +286,11 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
   portfolios: Portfolio[] = [];
   selectedPortfolioId = '';
   selectedSnapshotId = '';
+  compareFromSnapshotId = '';
+  compareToSnapshotId = '';
   snapshots: PortfolioSnapshot[] = [];
+  snapshotCompare: PortfolioSnapshotCompareResponse | null = null;
+  compareLoading = false;
   savingSnapshot = false;
 
   loading = false;
@@ -271,6 +353,9 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
 
   onPortfolioChange(): void {
     this.selectedSnapshotId = '';
+    this.compareFromSnapshotId = '';
+    this.compareToSnapshotId = '';
+    this.snapshotCompare = null;
     this.loadSnapshots();
     this.loadLiveAnalyticsForSelectedPortfolio();
   }
@@ -317,11 +402,44 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
     this.portfolioService.getPortfolioSnapshots(this.selectedPortfolioId).pipe(takeUntil(this.destroy$)).subscribe({
       next: snapshots => {
         this.snapshots = [...snapshots].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        this.setDefaultCompareSnapshotIds();
       },
       error: () => {
         this.snapshots = [];
+        this.compareFromSnapshotId = '';
+        this.compareToSnapshotId = '';
       }
     });
+  }
+
+  get canRunCompare(): boolean {
+    return !!this.selectedPortfolioId &&
+      !!this.compareFromSnapshotId &&
+      !!this.compareToSnapshotId &&
+      this.compareFromSnapshotId !== this.compareToSnapshotId;
+  }
+
+  runSnapshotCompare(): void {
+    if (!this.canRunCompare || !this.selectedPortfolioId) {
+      return;
+    }
+    this.compareLoading = true;
+    this.errorMessage = null;
+
+    this.portfolioService
+      .getPortfolioSnapshotCompare(this.selectedPortfolioId, this.compareFromSnapshotId, this.compareToSnapshotId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: compare => {
+          this.compareLoading = false;
+          this.snapshotCompare = compare;
+        },
+        error: err => {
+          this.compareLoading = false;
+          this.snapshotCompare = null;
+          this.errorMessage = err?.error?.message ?? err?.error ?? 'Failed to compare snapshots.';
+        }
+      });
   }
 
   private loadSnapshotById(snapshotId: string): void {
@@ -445,6 +563,40 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
   private getSelectedPortfolioName(): string {
     const portfolio = this.portfolios.find(p => p.id === this.selectedPortfolioId);
     return portfolio?.name ?? 'Selected Portfolio';
+  }
+
+  private setDefaultCompareSnapshotIds(): void {
+    if (this.snapshots.length < 2) {
+      this.compareFromSnapshotId = '';
+      this.compareToSnapshotId = '';
+      this.snapshotCompare = null;
+      return;
+    }
+
+    if (!this.compareFromSnapshotId) {
+      this.compareFromSnapshotId = this.snapshots[this.snapshots.length - 1].id;
+    }
+    if (!this.compareToSnapshotId) {
+      this.compareToSnapshotId = this.snapshots[0].id;
+    }
+  }
+
+  deltaClass(value: number): string {
+    if (value > 0) return 'text-green-400';
+    if (value < 0) return 'text-red-400';
+    return 'text-slate-200';
+  }
+
+  signedCurrency(value: number): string {
+    return `${value >= 0 ? '+' : '-'}$${Math.abs(value).toFixed(2)}`;
+  }
+
+  signedPercent(value: number): string {
+    return `${value >= 0 ? '+' : '-'}${Math.abs(value).toFixed(2)}%`;
+  }
+
+  signedNumber(value: number): string {
+    return `${value >= 0 ? '+' : '-'}${Math.abs(value).toFixed(2)}`;
   }
 
   ngOnDestroy(): void {
