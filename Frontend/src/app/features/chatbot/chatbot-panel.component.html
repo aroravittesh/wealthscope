@@ -39,6 +39,21 @@
     </div>
   </div>
 
+  <section *ngIf="showSuggestedPrompts" class="chatbot-suggestions" aria-label="Suggested prompts">
+    <p class="chatbot-suggestions__label">Try one of these:</p>
+    <div class="chatbot-suggestions__grid">
+      <button
+        type="button"
+        class="suggestion-chip"
+        *ngFor="let prompt of suggestedPrompts; trackBy: trackBySuggestedPrompt"
+        (click)="onSelectSuggestedPrompt(prompt)"
+        [disabled]="isLoading"
+      >
+        {{ prompt }}
+      </button>
+    </div>
+  </section>
+
   <p *ngIf="requestError" class="request-error">{{ requestError }}</p>
 
   <form class="chat-input-row" (submit)="sendMessage()">

@@ -25,6 +25,14 @@ export class ChatbotPanelComponent implements AfterViewChecked {
   readonly sessionId = 'demo-session-1';
   readonly title = 'Leo';
   readonly subtitle = 'Your portfolio & markets assistant';
+  readonly suggestedPrompts: readonly string[] = [
+    'Compare AAPL and MSFT',
+    'Explain my portfolio risk',
+    'Latest news on TSLA',
+    'What is beta?',
+    'Summarize my portfolio',
+    'Explain diversification'
+  ];
 
   messages: ChatMessage[] = [
     {
@@ -89,11 +97,27 @@ export class ChatbotPanelComponent implements AfterViewChecked {
       });
   }
 
+  get showSuggestedPrompts(): boolean {
+    return !this.isLoading && this.messages.every((message) => message.sender !== 'user');
+  }
+
+  onSelectSuggestedPrompt(prompt: string): void {
+    if (this.isLoading) {
+      return;
+    }
+    this.draftMessage = prompt;
+    this.sendMessage();
+  }
+
   trackByMessage(index: number): number {
     return index;
   }
 
   trackByParagraphIndex(index: number): number {
+    return index;
+  }
+
+  trackBySuggestedPrompt(index: number): number {
     return index;
   }
 
