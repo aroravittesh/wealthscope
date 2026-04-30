@@ -27,6 +27,17 @@ describe('AdminDashboardComponent', () => {
     volume: 500,
   };
 
+  const sampleLog = {
+    id: 'log-1',
+    actorUserId: 'admin-1',
+    action: 'ASSET_CREATED',
+    entityType: 'asset',
+    entityId: 'a1',
+    beforeJson: '',
+    afterJson: '{"symbol":"AAPL"}',
+    createdAt: new Date(),
+  };
+
   beforeEach(async () => {
     adminServiceSpy = jasmine.createSpyObj<AdminService>('AdminService', [
       'getUsers',
@@ -35,6 +46,7 @@ describe('AdminDashboardComponent', () => {
       'createAsset',
       'updateAsset',
       'deleteAsset',
+      'getAuditLogs',
     ]);
 
     adminServiceSpy.getUsers.and.returnValue(of([sampleUser]));
@@ -43,6 +55,7 @@ describe('AdminDashboardComponent', () => {
     adminServiceSpy.createAsset.and.returnValue(of(sampleAsset));
     adminServiceSpy.updateAsset.and.returnValue(of(sampleAsset));
     adminServiceSpy.deleteAsset.and.returnValue(of({}));
+    adminServiceSpy.getAuditLogs.and.returnValue(of([sampleLog]));
 
     await TestBed.configureTestingModule({
       imports: [AdminDashboardComponent],
@@ -58,8 +71,10 @@ describe('AdminDashboardComponent', () => {
   it('should load users and assets on init', () => {
     expect(adminServiceSpy.getUsers).toHaveBeenCalled();
     expect(adminServiceSpy.getAssets).toHaveBeenCalled();
+    expect(adminServiceSpy.getAuditLogs).toHaveBeenCalled();
     expect(component.users.length).toBe(1);
     expect(component.assets.length).toBe(1);
+    expect(component.auditLogs.length).toBe(1);
   });
 
   it('reloadAll should clear messages and reload data', () => {

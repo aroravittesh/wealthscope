@@ -156,4 +156,35 @@ describe('AdminService', () => {
     expect(req.request.method).toBe('DELETE');
     req.flush({ message: 'gone' });
   });
+
+  it('getAuditLogs should map audit log rows', () => {
+    const createdAt = '2026-04-29T10:00:00.000Z';
+    const backend = [
+      {
+        id: 'log-1',
+        actor_user_id: 'admin-1',
+        action: 'ASSET_CREATED',
+        entity_type: 'asset',
+        entity_id: 'asset-1',
+        before_json: '',
+        after_json: '{"symbol":"AAPL"}',
+        created_at: createdAt,
+      },
+    ];
+
+    service.getAuditLogs(25).subscribe(logs => {
+      expect(logs.length).toBe(1);
+      expect(logs[0].id).toBe('log-1');
+      expect(logs[0].actorUserId).toBe('admin-1');
+      expect(logs[0].action).toBe('ASSET_CREATED');
+      expect(logs[0].entityType).toBe('asset');
+      expect(logs[0].entityId).toBe('asset-1');
+      expect(logs[0].afterJson).toContain('AAPL');
+      expect(logs[0].createdAt.toISOString()).toBe(createdAt);
+    });
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/admin/audit-logs?limit=25`);
+    expect(req.request.method).toBe('GET');
+    req.flush(backend);
+  });
 });
