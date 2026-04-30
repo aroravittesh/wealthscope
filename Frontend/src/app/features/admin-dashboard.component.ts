@@ -291,6 +291,20 @@ import { AdminAsset, AdminAssetPayload, AdminAuditLog, AdminService, AdminUser }
             </div>
           </div>
 
+          <div class="px-4 py-3 border-b border-slate-700 flex items-center justify-between gap-3">
+            <p class="text-xs text-slate-400">
+              Showing {{ filteredAuditLogs.length }} of {{ auditLogs.length }} records
+            </p>
+            <button
+              type="button"
+              (click)="exportFilteredAuditLogsCsv()"
+              class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded text-xs font-semibold"
+              [disabled]="filteredAuditLogs.length === 0"
+            >
+              Export CSV
+            </button>
+          </div>
+
           <div *ngIf="loadingAuditLogs" class="p-4 text-slate-300 text-sm">Loading activity...</div>
           <div *ngIf="!loadingAuditLogs && filteredAuditLogs.length === 0" class="p-4 text-slate-400 text-sm">No activity records found.</div>
 
@@ -492,6 +506,46 @@ export class AdminDashboardComponent implements OnInit {
 
       return haystack.includes(term);
     });
+  }
+
+  exportFilteredAuditLogsCsv(): void {
+    if (this.filteredAuditLogs.length === 0) {
+      this.errorMessage = 'No activity logs available to export.';
+      return;
+    }
+
+    const csv = this.buildAuditLogCsv(this.filteredAuditLogs);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `admin-activity-log-${new Date().toISOString()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    this.successMessage = `Exported ${this.filteredAuditLogs.length} activity records.`;
+  }
+
+  buildAuditLogCsv(rows: AdminAuditLog[]): string {
+    const headers = ['timestamp', 'actor_user_id', 'action', 'entity_type', 'entity_id', 'before_json', 'after_json'];
+    const lines = rows.map(log => [
+      log.createdAt.toISOString(),
+      log.actorUserId,
+      log.action,
+      log.entityType,
+      log.entityId,
+      log.beforeJson,
+      log.afterJson
+    ].map(value => this.toCsvCell(value)).join(','));
+
+    return [headers.join(','), ...lines].join('\n');
+  }
+
+  private toCsvCell(value: string): string {
+    const safe = (value ?? '').replace(/"/g, '""');
+    return `"${safe}"`;
   }
 
   private loadUsers(): void {
