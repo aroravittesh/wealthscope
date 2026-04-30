@@ -52,6 +52,18 @@ class TestFlaskContract(unittest.TestCase):
         r = app.test_client().post("/classify-intent", json={"message": "   "})
         self.assertEqual(r.status_code, 400)
 
+    def test_health_endpoint(self):
+        if not (ML_ROOT / "intent_model.joblib").is_file():
+            self.skipTest("bundled model missing")
+
+        import intent_inference_service as inf
+
+        r = inf.app.test_client().get("/health")
+        self.assertEqual(r.status_code, 200)
+        body = r.get_json()
+        self.assertEqual(body.get("status"), "ok")
+        self.assertEqual(set(body.get("labels", [])), inf.ALLOWED_LABELS)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -166,11 +166,22 @@ func qaRowToChunk(rec []string) (KnowledgeChunk, error) {
 		tags = append(tags, strings.ToUpper(ticker))
 	}
 
+	meta := map[string]string{
+		"priority":    strings.ToLower(pri),
+		"source_type": strings.ToLower(src),
+		"difficulty":  strings.ToLower(diff),
+		"category":    category,
+	}
+	if ticker != "" {
+		meta["ticker"] = strings.ToUpper(ticker)
+	}
+
 	return KnowledgeChunk{
-		ID:      id,
-		Topic:   topic,
-		Content: content,
-		Tags:    tags,
+		ID:       id,
+		Topic:    topic,
+		Content:  content,
+		Tags:     tags,
+		Metadata: meta,
 	}, nil
 }
 
@@ -225,16 +236,9 @@ func RetrieveQAWithContext(query string, ctx RetrievalContext, topK int) []Knowl
 	}
 
 	candidates := idx.search(query, len(idx.chunks))
-	boosted := applyEntityBoost(candidates, ctx)
-	sort.Slice(boosted, func(i, j int) bool { return boosted[i].similarity > boosted[j].similarity })
-
-	best := 0.0
-	if len(boosted) > 0 {
-		best = boosted[0].similarity
-	}
-	useSemantic := len(boosted) > 0 && best >= semanticMinSimilarity
-	if useSemantic {
-		return trimChunks(boosted, topK)
+	ranked := Rerank(query, candidates, ctx, DefaultRankWeights)
+	if len(ranked) > 0 {
+		return trimRanked(ranked, topK)
 	}
 	return retrieveQALexical(query, topK, chunks)
 }

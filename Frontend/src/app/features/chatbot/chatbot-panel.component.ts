@@ -24,12 +24,12 @@ export class ChatbotPanelComponent implements AfterViewChecked {
 
   readonly sessionId = 'demo-session-1';
   readonly title = 'Leo';
-  readonly subtitle = 'Aurex Assistant';
+  readonly subtitle = 'Your portfolio & markets assistant';
 
   messages: ChatMessage[] = [
     {
       sender: 'bot',
-      text: 'Hi, I am Leo. Ask me about your portfolio, market trends, or Aurex features.',
+      text: 'Hi, I am Leo—your dashboard assistant. Ask about portfolios, market trends, or platform features.',
       createdAt: new Date()
     }
   ];
@@ -91,6 +91,29 @@ export class ChatbotPanelComponent implements AfterViewChecked {
 
   trackByMessage(index: number): number {
     return index;
+  }
+
+  trackByParagraphIndex(index: number): number {
+    return index;
+  }
+
+  /**
+   * Splits assistant/user text into paragraphs for display. Double newlines
+   * (blank lines) start a new paragraph; single newlines are preserved via
+   * CSS `white-space: pre-line` on each paragraph.
+   */
+  splitMessageParagraphs(text: string): string[] {
+    const raw = text ?? '';
+    const normalized = raw.replace(/\r\n/g, '\n');
+    const trimmed = normalized.trim();
+    if (!trimmed) {
+      return [''];
+    }
+    const blocks = normalized
+      .split(/\n{2,}/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    return blocks.length > 0 ? blocks : [trimmed];
   }
 
   private pushMessage(sender: 'user' | 'bot', text: string, error = false): void {

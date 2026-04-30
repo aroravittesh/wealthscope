@@ -1,8 +1,6 @@
 package rag
 
 import (
-	"sort"
-	"strings"
 	"sync"
 
 	"wealthscope-ai/internal/entity"
@@ -36,7 +34,10 @@ func RetrievalContextFromEntity(ent entity.EntityResult) RetrievalContext {
 	}
 }
 
-// RetrieveWithContext runs TF-IDF semantic search with entity boosts, then lexical fallback.
+// RetrieveWithContext returns the top-K knowledge chunks for a query, ranked
+// by the hybrid reranker (semantic + lexical + entity + metadata). If the
+// reranker filters out every candidate (no textual overlap at all), it falls
+// back to legacy pure-lexical retrieval to preserve old behavior.
 func RetrieveWithContext(query string, ctx RetrievalContext, topK int) []KnowledgeChunk {
 	if topK <= 0 {
 		return nil
@@ -44,18 +45,9 @@ func RetrieveWithContext(query string, ctx RetrievalContext, topK int) []Knowled
 
 	idx := semanticIndex()
 	candidates := idx.search(query, len(idx.chunks))
-	boosted := applyEntityBoost(candidates, ctx)
-
-	sort.Slice(boosted, func(i, j int) bool { return boosted[i].similarity > boosted[j].similarity })
-
-	best := 0.0
-	if len(boosted) > 0 {
-		best = boosted[0].similarity
-	}
-
-	useSemantic := len(boosted) > 0 && best >= semanticMinSimilarity
-	if useSemantic {
-		return trimChunks(boosted, topK)
+	ranked := Rerank(query, candidates, ctx, DefaultRankWeights)
+	if len(ranked) > 0 {
+		return trimRanked(ranked, topK)
 	}
 
 	fallback := RetrieveLexical(query, topK)
@@ -63,49 +55,4 @@ func RetrieveWithContext(query string, ctx RetrievalContext, topK int) []Knowled
 		return nil
 	}
 	return fallback
-}
-
-func applyEntityBoost(hits []scoredChunk, ctx RetrievalContext) []scoredChunk {
-	if len(hits) == 0 {
-		return nil
-	}
-	syms := make([]string, 0, 1+len(ctx.SecondaryTickers))
-	if ctx.PrimaryTicker != "" {
-		syms = append(syms, strings.ToUpper(ctx.PrimaryTicker))
-	}
-	for _, s := range ctx.SecondaryTickers {
-		syms = append(syms, strings.ToUpper(s))
-	}
-	out := make([]scoredChunk, len(hits))
-	copy(out, hits)
-	for i := range out {
-		ch := &out[i].chunk
-		text := strings.ToUpper(ch.Content + " " + ch.Topic + " " + strings.Join(ch.Tags, " "))
-		for _, sym := range syms {
-			if sym != "" && strings.Contains(text, sym) {
-				out[i].similarity += 0.12
-			}
-		}
-		for _, term := range ctx.ExtraTerms {
-			t := strings.ToLower(term)
-			if t == "" {
-				continue
-			}
-			if strings.Contains(strings.ToLower(ch.Content+" "+ch.Topic), t) {
-				out[i].similarity += 0.06
-			}
-		}
-	}
-	return out
-}
-
-func trimChunks(scored []scoredChunk, topK int) []KnowledgeChunk {
-	out := make([]KnowledgeChunk, 0, topK)
-	for i, sc := range scored {
-		if i >= topK {
-			break
-		}
-		out = append(out, sc.chunk)
-	}
-	return out
 }

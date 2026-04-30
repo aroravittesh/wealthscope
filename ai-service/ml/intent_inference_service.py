@@ -27,6 +27,18 @@ ALLOWED_LABELS, VECTORIZER, MODEL = load_artifacts()
 app = Flask(__name__)
 
 
+@app.get("/health")
+def health():
+    """Liveness/readiness probe for compose / orchestrators."""
+    return jsonify(
+        {
+            "status": "ok",
+            "labels": sorted(ALLOWED_LABELS),
+            "model_classes": list(getattr(MODEL, "classes_", [])),
+        }
+    )
+
+
 @app.post("/classify-intent")
 def classify_intent():
     payload = request.get_json(silent=True) or {}

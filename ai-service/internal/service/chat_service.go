@@ -1,8 +1,10 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"wealthscope-ai/internal/chatprompt"
 	"wealthscope-ai/internal/entity"
@@ -10,7 +12,16 @@ import (
 	"wealthscope-ai/internal/ml"
 	"wealthscope-ai/internal/openai"
 	"wealthscope-ai/internal/rag"
+	"wealthscope-ai/internal/websearch"
 )
+
+// webSearchTimeout is the per-call ceiling on the live web search step.
+// Failures and timeouts are swallowed so the chat call never blocks on web.
+const webSearchTimeout = 4 * time.Second
+
+// webSearchTopK is the number of cleaned web results we forward into the
+// prompt. Keep this small so the LLM has room for internal grounding.
+const webSearchTopK = 3
 
 // EnvelopeMarketFetchers overrides live market/news HTTP for BuildEnvelopeInputForChat (tests).
 type EnvelopeMarketFetchers struct {
@@ -128,18 +139,50 @@ func BuildEnvelopeInputForChat(message string) chatprompt.EnvelopeInput {
 		}
 	}
 
+	webBody := buildWebContextBody(message, string(intentResult.Intent), ent)
+
 	return chatprompt.EnvelopeInput{
 		UserMessage:      message,
 		KnowledgeLines:   knowledgeLines,
 		QAKnowledgeLines: qaKnowledgeLines,
 		LiveMarketBody:   strings.TrimSpace(liveMarket.String()),
 		NewsBody:         strings.TrimSpace(newsBody.String()),
+		WebContextBody:   webBody,
 		PortfolioBody:    "",
 		Intent:           string(intentResult.Intent),
 		Ticker:           intentResult.Ticker,
 		Sentiment:        string(sentiment),
 		IntentConfidence: intentResult.Confidence,
 	}
+}
+
+// buildWebContextBody runs the live web search step. It is fully optional and
+// degrades silently: if the decision says no, the provider is unconfigured,
+// the call errors, or the cleaner drops every hit, this returns "" and the
+// envelope renders the standard "no live web search results" note.
+func buildWebContextBody(message, intent string, ent entity.EntityResult) string {
+	decision := websearch.Decide(message, intent, ent)
+	if !decision.Use {
+		return ""
+	}
+	provider := websearch.DefaultProvider()
+	if provider == nil {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), webSearchTimeout)
+	defer cancel()
+	raw, err := provider.Search(ctx, decision.Query, 5)
+	if err != nil {
+		// Intentional silent fallback: chat must never break on a flaky
+		// upstream search provider. Operators can correlate via the provider
+		// logs; the prompt will state "no live web search results".
+		return ""
+	}
+	cleaned := websearch.CleanAndRank(raw, webSearchTopK)
+	if len(cleaned) == 0 {
+		return ""
+	}
+	return websearch.FormatForPrompt(cleaned)
 }
 
 func shouldEnrichMarket(intent ml.Intent, ticker string) bool {

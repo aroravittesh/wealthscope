@@ -1,6 +1,7 @@
-<section class="chatbot-panel" role="dialog" aria-label="Aurex chatbot">
+<section class="chatbot-panel" role="dialog" aria-label="Leo dashboard assistant">
   <header class="chatbot-header">
     <div>
+      <span class="chatbot-widget-label">Dashboard assistant</span>
       <h3>{{ title }}</h3>
       <p>{{ subtitle }}</p>
     </div>
@@ -20,13 +21,20 @@
         [class.bot]="message.sender === 'bot'"
         [class.error]="message.error"
       >
-        {{ message.text }}
+        <div class="message-bubble__inner">
+          <p
+            *ngFor="let para of splitMessageParagraphs(message.text); trackBy: trackByParagraphIndex"
+            class="message-paragraph"
+          >
+            {{ para }}
+          </p>
+        </div>
       </article>
     </div>
 
-    <div *ngIf="isLoading" class="message-row">
+    <div *ngIf="isLoading" class="message-row message-row--bot">
       <article class="message-bubble bot loading">
-        Leo is typing...
+        <span class="message-bubble__inner message-bubble__inner--plain">Leo is typing...</span>
       </article>
     </div>
   </div>

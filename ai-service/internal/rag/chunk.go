@@ -1,11 +1,16 @@
 package rag
 
 // KnowledgeChunk is one retrievable unit for RAG grounding.
+//
+// Metadata carries optional structured signals (priority, source_type,
+// difficulty, category, ticker) that the hybrid reranker consumes. KB chunks
+// can omit it; the reranker treats missing metadata as a neutral baseline.
 type KnowledgeChunk struct {
-	ID      string
-	Topic   string
-	Content string
-	Tags    []string
+	ID       string
+	Topic    string
+	Content  string
+	Tags     []string
+	Metadata map[string]string
 }
 
 func chunkFromDoc(doc FinancialDocument) KnowledgeChunk {

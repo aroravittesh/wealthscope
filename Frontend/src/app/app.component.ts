@@ -11,13 +11,25 @@ import { ChatbotLauncherComponent } from './features/chatbot/chatbot-launcher.co
   standalone: true,
   imports: [RouterOutlet, CommonModule, NavbarComponent, ChatbotLauncherComponent],
   template: `
-    <div class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div
+      class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col"
+    >
       <app-navbar *ngIf="showNavbar"></app-navbar>
-      
-      <main [class]="showNavbar ? ' mx-auto  ' : ''">
+
+      <main class="flex-1 min-h-0 w-full" [class]="showNavbar ? ' mx-auto  ' : ''">
         <router-outlet></router-outlet>
       </main>
-      <app-chatbot-launcher></app-chatbot-launcher>
+
+      <footer
+        class="leo-assistant-strip shrink-0 border-t border-slate-700/50 bg-slate-950/75 backdrop-blur-md"
+        aria-label="Assistant"
+      >
+        <div
+          class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-3 sm:py-3.5 flex justify-end items-center"
+        >
+          <app-chatbot-launcher></app-chatbot-launcher>
+        </div>
+      </footer>
     </div>
   `,
   styles: []

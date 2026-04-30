@@ -51,6 +51,11 @@ func main() {
 
     router.GET("/news-sentiment/:symbol", handler.NewsSentimentHandler)
 
+    // Feedback collection (learning-oriented logging pipeline).
+    router.POST("/feedback", handler.RecordFeedbackHandler)
+    router.GET("/feedback", handler.ListFeedbackHandler)
+    router.GET("/feedback/export", handler.ExportFeedbackHandler)
+
     // Risk scoring endpoint
     router.POST("/risk", func(c *gin.Context) {
         var body struct {

@@ -11,9 +11,15 @@ const (
 	SectionQAKnowledge = "[Relevant QA Knowledge]"
 	SectionLiveMarket  = "[Live Market Data]"
 	SectionNews        = "[News Context]"
+	SectionWebContext  = "[Live Web Context]"
 	SectionPortfolio   = "[Portfolio Context]"
 	SectionSystem      = "[System Context]"
 )
+
+// UserReplyStyleFooter closes the grounded-context block with a reminder that
+// the model's visible reply should be natural prose (see system prompt). It
+// does not add facts—only style guidance for the assistant turn.
+const UserReplyStyleFooter = "\n\n--- End of grounded context ---\nWhen you reply to the user, write in natural paragraphs with a blank line between paragraphs. The bracketed sections above are internal reference only—do not echo their titles or use rigid labels (Description:, Summary:, Value:, Risk:, etc.) in your answer."
 
 // EnvelopeInput carries optional context blocks for the user message sent to the LLM.
 type EnvelopeInput struct {
@@ -22,6 +28,7 @@ type EnvelopeInput struct {
 	QAKnowledgeLines []string // curated Q&A CSV retrieval lines
 	LiveMarketBody   string   // preformatted quote + fundamentals, or empty
 	NewsBody         string   // preformatted headlines, or empty
+	WebContextBody   string   // preformatted live web search results, or empty
 	PortfolioBody    string   // empty → default "no portfolio" line
 	Intent           string
 	Ticker           string
@@ -79,6 +86,9 @@ func BuildUserContent(in EnvelopeInput) string {
 	writeSection(SectionNews, in.NewsBody,
 		"(No news headlines were attached for this request.)")
 
+	writeSection(SectionWebContext, in.WebContextBody,
+		"(No live web search results were attached for this request.)")
+
 	portfolio := strings.TrimSpace(in.PortfolioBody)
 	if portfolio == "" {
 		portfolio = "(No portfolio holdings or allocation were provided in this request.)"
@@ -95,5 +105,6 @@ func BuildUserContent(in EnvelopeInput) string {
 		in.IntentConfidence,
 	))
 
+	b.WriteString(UserReplyStyleFooter)
 	return b.String()
 }
