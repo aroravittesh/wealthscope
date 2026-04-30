@@ -30,6 +30,17 @@ export interface AdminAssetPayload {
   volume: number;
 }
 
+export interface AdminAuditLog {
+  id: string;
+  actorUserId: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  beforeJson: string;
+  afterJson: string;
+  createdAt: Date;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -73,6 +84,12 @@ export class AdminService {
     return this.http.delete<{ message?: string }>(`${this.adminApiUrl}/assets/${assetId}`);
   }
 
+  getAuditLogs(limit = 50): Observable<AdminAuditLog[]> {
+    return this.http
+      .get<any[]>(`${this.adminApiUrl}/audit-logs?limit=${limit}`)
+      .pipe(map(rows => (rows || []).map(row => this.mapAuditLog(row))));
+  }
+
   private mapAdminUser(row: any): AdminUser {
     return {
       id: String(row.id),
@@ -102,6 +119,19 @@ export class AdminService {
       current_price: payload.currentPrice,
       market_cap: payload.marketCap,
       volume: payload.volume
+    };
+  }
+
+  private mapAuditLog(row: any): AdminAuditLog {
+    return {
+      id: String(row.id),
+      actorUserId: row.actor_user_id ?? row.actorUserId ?? '',
+      action: row.action ?? '',
+      entityType: row.entity_type ?? row.entityType ?? '',
+      entityId: row.entity_id ?? row.entityId ?? '',
+      beforeJson: row.before_json ?? row.beforeJson ?? '',
+      afterJson: row.after_json ?? row.afterJson ?? '',
+      createdAt: new Date(row.created_at ?? row.createdAt)
     };
   }
 }

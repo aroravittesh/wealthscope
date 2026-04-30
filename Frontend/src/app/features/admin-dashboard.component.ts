@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AdminAsset, AdminAssetPayload, AdminService, AdminUser } from '../services/admin.service';
+import { AdminAsset, AdminAssetPayload, AdminAuditLog, AdminService, AdminUser } from '../services/admin.service';
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -48,6 +48,14 @@ import { AdminAsset, AdminAssetPayload, AdminService, AdminUser } from '../servi
             [ngClass]="activeTab === 'assets' ? 'bg-yellow-600 text-white border-yellow-500' : 'bg-slate-900 text-slate-300 border-slate-700'"
           >
             Assets
+          </button>
+          <button
+            type="button"
+            (click)="activeTab = 'activity'"
+            class="px-4 py-2 rounded-lg text-sm font-semibold border"
+            [ngClass]="activeTab === 'activity' ? 'bg-yellow-600 text-white border-yellow-500' : 'bg-slate-900 text-slate-300 border-slate-700'"
+          >
+            Activity Log
           </button>
         </div>
 
@@ -229,19 +237,54 @@ import { AdminAsset, AdminAssetPayload, AdminService, AdminUser } from '../servi
             </div>
           </div>
         </section>
+
+        <section *ngIf="activeTab === 'activity'" class="bg-slate-900 rounded-xl border border-slate-700 overflow-hidden">
+          <div class="p-4 border-b border-slate-700">
+            <h3 class="text-lg font-semibold text-white">Admin Activity Log</h3>
+            <p class="text-slate-400 text-xs mt-1">Recent privileged actions for governance and troubleshooting.</p>
+          </div>
+
+          <div *ngIf="loadingAuditLogs" class="p-4 text-slate-300 text-sm">Loading activity...</div>
+          <div *ngIf="!loadingAuditLogs && auditLogs.length === 0" class="p-4 text-slate-400 text-sm">No activity records found.</div>
+
+          <div *ngIf="!loadingAuditLogs && auditLogs.length > 0" class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+              <thead class="bg-slate-800 text-slate-300">
+                <tr>
+                  <th class="text-left p-3">Time</th>
+                  <th class="text-left p-3">Actor</th>
+                  <th class="text-left p-3">Action</th>
+                  <th class="text-left p-3">Target</th>
+                  <th class="text-left p-3">Entity ID</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let log of auditLogs" class="border-t border-slate-800">
+                  <td class="p-3 text-slate-200 whitespace-nowrap">{{ log.createdAt | date:'medium' }}</td>
+                  <td class="p-3 text-slate-300">{{ log.actorUserId || '-' }}</td>
+                  <td class="p-3 text-slate-100 font-semibold">{{ log.action }}</td>
+                  <td class="p-3 text-slate-400 uppercase">{{ log.entityType }}</td>
+                  <td class="p-3 text-slate-400">{{ log.entityId || '-' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
     </div>
   `,
   styles: []
 })
 export class AdminDashboardComponent implements OnInit {
-  activeTab: 'users' | 'assets' = 'users';
+  activeTab: 'users' | 'assets' | 'activity' = 'users';
 
   users: AdminUser[] = [];
   assets: AdminAsset[] = [];
+  auditLogs: AdminAuditLog[] = [];
 
   loadingUsers = false;
   loadingAssets = false;
+  loadingAuditLogs = false;
   updatingUserId: string | null = null;
   savingAsset = false;
   deletingAssetId: string | null = null;
@@ -263,6 +306,7 @@ export class AdminDashboardComponent implements OnInit {
     this.successMessage = null;
     this.loadUsers();
     this.loadAssets();
+    this.loadAuditLogs();
   }
 
   saveUserRole(user: AdminUser): void {
@@ -364,6 +408,20 @@ export class AdminDashboardComponent implements OnInit {
       error: err => {
         this.loadingAssets = false;
         this.errorMessage = err?.error?.message ?? err?.error ?? 'Failed to load assets.';
+      }
+    });
+  }
+
+  private loadAuditLogs(): void {
+    this.loadingAuditLogs = true;
+    this.adminService.getAuditLogs(100).subscribe({
+      next: logs => {
+        this.loadingAuditLogs = false;
+        this.auditLogs = logs;
+      },
+      error: err => {
+        this.loadingAuditLogs = false;
+        this.errorMessage = err?.error?.message ?? err?.error ?? 'Failed to load activity logs.';
       }
     });
   }
