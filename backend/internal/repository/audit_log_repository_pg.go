@@ -39,3 +39,38 @@ func (r *AuditLogRepositoryPG) Create(log *models.AuditLog) error {
 	)
 	return err
 }
+
+func (r *AuditLogRepositoryPG) List(limit int) ([]models.AuditLog, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := r.DB.Query(`
+		SELECT id, COALESCE(actor_user_id::text, ''), action, entity_type, COALESCE(entity_id::text, ''), COALESCE(before_json, ''), COALESCE(after_json, ''), created_at
+		FROM audit_logs
+		ORDER BY created_at DESC
+		LIMIT $1
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]models.AuditLog, 0, limit)
+	for rows.Next() {
+		var a models.AuditLog
+		if err := rows.Scan(
+			&a.ID,
+			&a.ActorUserID,
+			&a.Action,
+			&a.EntityType,
+			&a.EntityID,
+			&a.BeforeJSON,
+			&a.AfterJSON,
+			&a.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}

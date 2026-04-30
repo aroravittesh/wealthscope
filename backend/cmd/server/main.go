@@ -142,6 +142,7 @@ func main() {
 	).Methods("GET")
 
 	// admin (JWT role ADMIN)
+	api.Handle("/admin/audit-logs", adminOnly(adminHandler.ListAuditLogs)).Methods("GET")
 	api.Handle("/admin/users", adminOnly(adminHandler.ListUsers)).Methods("GET")
 	api.Handle("/admin/users/{id}/role", adminOnly(adminHandler.UpdateUserRole)).Methods("PATCH")
 	api.Handle("/admin/assets", adminOnly(adminHandler.ListAssets)).Methods("GET")
