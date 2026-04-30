@@ -86,6 +86,9 @@ type webSearchTrace struct {
 }
 
 type chatPipelineTrace struct {
+	FollowUpResolved   bool
+	FollowUpTicker     string
+	FollowUpReason     string
 	EntityPrimary     string
 	EntitySecondaryN  int
 	EntityCompaniesN  int
@@ -106,7 +109,7 @@ type chatPipelineTrace struct {
 
 func ProcessMessage(sessionID string, message string) (string, error) {
 	start := time.Now()
-	in, trace := buildEnvelopeInputForChat(message)
+	in, trace := buildEnvelopeInputForChat(sessionID, message)
 	logChatPipelineEnrichment(sessionID, message, trace)
 
 	enriched := chatprompt.BuildUserContent(in)
@@ -133,15 +136,21 @@ func ProcessMessage(sessionID string, message string) (string, error) {
 // BuildEnvelopeInputForChat runs retrieval, optional live market enrichment, and intent/sentiment metadata.
 // Exposed for tests (no OpenAI call).
 func BuildEnvelopeInputForChat(message string) chatprompt.EnvelopeInput {
-	in, _ := buildEnvelopeInputForChat(message)
+	in, _ := buildEnvelopeInputForChat("", message)
 	return in
 }
 
-func buildEnvelopeInputForChat(message string) (chatprompt.EnvelopeInput, chatPipelineTrace) {
-	ent := entity.Extract(message)
-	intentResult := ml.DetectIntent(message)
-	sentiment := ml.AnalyzeSentiment(message)
+func buildEnvelopeInputForChat(sessionID, message string) (chatprompt.EnvelopeInput, chatPipelineTrace) {
+	follow := resolveFollowUpContext(sessionID, message)
+	resolvedMessage := applyFollowUpCarryover(message, follow)
+
+	ent := entity.Extract(resolvedMessage)
+	intentResult := ml.DetectIntent(resolvedMessage)
+	sentiment := ml.AnalyzeSentiment(resolvedMessage)
 	trace := chatPipelineTrace{
+		FollowUpResolved: follow.CarriedTicker != "",
+		FollowUpTicker:   follow.CarriedTicker,
+		FollowUpReason:   follow.Reason,
 		EntityPrimary:    ent.PrimaryTicker,
 		EntitySecondaryN: len(ent.SecondaryTickers),
 		EntityCompaniesN: len(ent.CompanyMatches),
@@ -155,7 +164,7 @@ func buildEnvelopeInputForChat(message string) (chatprompt.EnvelopeInput, chatPi
 	var knowledgeLines []string
 	var qaKnowledgeLines []string
 	rctx := rag.RetrievalContextFromEntity(ent)
-	chunks := rag.RetrieveWithContext(message, rctx, 3)
+	chunks := rag.RetrieveWithContext(resolvedMessage, rctx, 3)
 	for _, ch := range chunks {
 		knowledgeLines = append(knowledgeLines,
 			fmt.Sprintf("[%s] %s", ch.Topic, strings.TrimSpace(ch.Content)))
@@ -163,7 +172,7 @@ func buildEnvelopeInputForChat(message string) (chatprompt.EnvelopeInput, chatPi
 	trace.RAGResults = len(chunks)
 	trace.RAGUsed = len(chunks) > 0
 
-	qaChunks := rag.RetrieveQAWithContext(message, rctx, 3)
+	qaChunks := rag.RetrieveQAWithContext(resolvedMessage, rctx, 3)
 	for _, ch := range qaChunks {
 		q, a := rag.ChunkQAPair(ch)
 		qaKnowledgeLines = append(qaKnowledgeLines, rag.FormatQAKnowledgeLine(ch, q, a))
@@ -207,7 +216,7 @@ func buildEnvelopeInputForChat(message string) (chatprompt.EnvelopeInput, chatPi
 		}
 	}
 
-	webBody, webTrace := buildWebContextBody(message, string(intentResult.Intent), ent)
+	webBody, webTrace := buildWebContextBody(resolvedMessage, string(intentResult.Intent), ent)
 	trace.WebUsed = webTrace.CleanedCount > 0
 	trace.WebResults = webTrace.CleanedCount
 	trace.WebFallback = webTrace.Fallback
@@ -299,6 +308,9 @@ func logChatPipelineEnrichment(sessionID, message string, t chatPipelineTrace) {
 	logChatEvent("chat_pipeline_enrichment",
 		"session_id", sessionID,
 		"message_preview", messagePreview(message),
+		"followup_resolved", t.FollowUpResolved,
+		"followup_ticker", t.FollowUpTicker,
+		"followup_reason", t.FollowUpReason,
 		"intent", t.Intent,
 		"intent_confidence", fmt.Sprintf("%.2f", t.IntentConfidence),
 		"intent_source", t.IntentSource,

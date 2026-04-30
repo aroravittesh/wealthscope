@@ -170,3 +170,8 @@ func CallOpenAI(sessionID string, userInput string) (string, error) {
 func ClearSession(sessionID string) {
 	defaultStore.Clear(sessionID)
 }
+
+// SessionMessages returns a snapshot of stored messages for one session.
+func SessionMessages(sessionID string) []Message {
+	return defaultStore.Messages(sessionID)
+}
