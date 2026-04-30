@@ -146,6 +146,11 @@ func main() {
 		middleware.AuthMiddleware(http.HandlerFunc(reportingHandler.ComparePortfolioSnapshots)),
 	).Methods("GET")
 
+	api.Handle(
+		"/portfolios/{id}/snapshots/trend",
+		middleware.AuthMiddleware(http.HandlerFunc(reportingHandler.GetPortfolioSnapshotTrend)),
+	).Methods("GET")
+
 	// admin (JWT role ADMIN)
 	api.Handle("/admin/audit-logs", adminOnly(adminHandler.ListAuditLogs)).Methods("GET")
 	api.Handle("/admin/users", adminOnly(adminHandler.ListUsers)).Methods("GET")
