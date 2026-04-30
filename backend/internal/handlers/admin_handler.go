@@ -7,17 +7,23 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"wealthscope-backend/internal/middleware"
 	"wealthscope-backend/internal/models"
 	"wealthscope-backend/internal/repository"
 )
 
 type AdminHandler struct {
-	UserRepo  repository.UserRepository
-	AssetRepo repository.AssetRepository
+	UserRepo     repository.UserRepository
+	AssetRepo    repository.AssetRepository
+	AuditLogRepo repository.AuditLogRepository
 }
 
-func NewAdminHandler(userRepo repository.UserRepository, assetRepo repository.AssetRepository) *AdminHandler {
-	return &AdminHandler{UserRepo: userRepo, AssetRepo: assetRepo}
+func NewAdminHandler(
+	userRepo repository.UserRepository,
+	assetRepo repository.AssetRepository,
+	auditLogRepo repository.AuditLogRepository,
+) *AdminHandler {
+	return &AdminHandler{UserRepo: userRepo, AssetRepo: assetRepo, AuditLogRepo: auditLogRepo}
 }
 
 func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
@@ -36,6 +42,15 @@ type adminUpdateRoleRequest struct {
 
 func (h *AdminHandler) UpdateUserRole(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
+	before, err := h.UserRepo.FindByID(id)
+	if err != nil {
+		if err.Error() == "user not found" {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	var req adminUpdateRoleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
@@ -53,6 +68,20 @@ func (h *AdminHandler) UpdateUserRole(w http.ResponseWriter, r *http.Request) {
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if h.AuditLogRepo != nil {
+		actorUserID, _ := r.Context().Value(middleware.UserIDKey).(string)
+		beforeJSON, _ := json.Marshal(map[string]string{"role": before.Role})
+		afterJSON, _ := json.Marshal(map[string]string{"role": role})
+		_ = h.AuditLogRepo.Create(&models.AuditLog{
+			ActorUserID: actorUserID,
+			Action:      "USER_ROLE_UPDATED",
+			EntityType:  "user",
+			EntityID:    id,
+			BeforeJSON:  string(beforeJSON),
+			AfterJSON:   string(afterJSON),
+		})
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
