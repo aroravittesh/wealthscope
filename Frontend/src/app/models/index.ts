@@ -126,6 +126,21 @@ export interface PortfolioSnapshotCompareResponse {
   allocationDrift: AllocationDriftRow[];
 }
 
+export interface PortfolioSnapshotTrendPoint {
+  snapshotId: string;
+  createdAt: Date;
+  totalPortfolioValue: number;
+  totalInvested: number;
+  totalProfitLoss: number;
+  diversification: number;
+  volatility: number;
+}
+
+export interface PortfolioSnapshotTrendResponse {
+  portfolioId: string;
+  points: PortfolioSnapshotTrendPoint[];
+}
+
 export interface ChartData {
   labels: string[];
   datasets: {

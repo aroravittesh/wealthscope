@@ -11,6 +11,8 @@ import {
   Holding,
   Portfolio,
   PortfolioSnapshotCompareResponse,
+  PortfolioSnapshotTrendPoint,
+  PortfolioSnapshotTrendResponse,
   PortfolioSnapshot,
   PortfolioSummary,
   SnapshotDelta
@@ -138,6 +140,12 @@ export class PortfolioService {
     );
   }
 
+  getPortfolioSnapshotTrend(portfolioId: string, limit = 20): Observable<PortfolioSnapshotTrendResponse> {
+    return this.http
+      .get<any>(`${this.portfolioApiUrl}/${portfolioId}/snapshots/trend?limit=${limit}`)
+      .pipe(map(raw => this.mapPortfolioSnapshotTrendFromApi(raw)));
+  }
+
   getHoldings(portfolioId: string): Observable<Holding[]> {
     return this.http
       .get<any[]>(`${this.holdingsApiUrl}/${portfolioId}`)
@@ -262,6 +270,25 @@ export class PortfolioService {
       allocationDrift: (raw?.allocation_drift ?? raw?.allocationDrift ?? []).map((row: any) =>
         this.mapAllocationDriftRowFromApi(row)
       )
+    };
+  }
+
+  private mapPortfolioSnapshotTrendPointFromApi(raw: any): PortfolioSnapshotTrendPoint {
+    return {
+      snapshotId: String(raw?.snapshot_id ?? raw?.snapshotId ?? ''),
+      createdAt: new Date(raw?.created_at ?? raw?.createdAt ?? new Date().toISOString()),
+      totalPortfolioValue: Number(raw?.total_portfolio_value ?? raw?.totalPortfolioValue ?? 0),
+      totalInvested: Number(raw?.total_invested ?? raw?.totalInvested ?? 0),
+      totalProfitLoss: Number(raw?.total_profit_loss ?? raw?.totalProfitLoss ?? 0),
+      diversification: Number(raw?.diversification ?? 0),
+      volatility: Number(raw?.volatility ?? 0)
+    };
+  }
+
+  private mapPortfolioSnapshotTrendFromApi(raw: any): PortfolioSnapshotTrendResponse {
+    return {
+      portfolioId: String(raw?.portfolio_id ?? raw?.portfolioId ?? ''),
+      points: (raw?.points ?? []).map((p: any) => this.mapPortfolioSnapshotTrendPointFromApi(p))
     };
   }
 }

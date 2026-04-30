@@ -5,7 +5,7 @@ import { RouterModule } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortfolioService } from '../services/portfolio.service';
-import { Portfolio, PortfolioSnapshot, PortfolioSnapshotCompareResponse, PortfolioSummary } from '../models';
+import { Portfolio, PortfolioSnapshot, PortfolioSnapshotCompareResponse, PortfolioSnapshotTrendPoint, PortfolioSummary } from '../models';
 
 @Component({
   selector: 'app-reporting-analytics',
@@ -167,6 +167,27 @@ import { Portfolio, PortfolioSnapshot, PortfolioSnapshotCompareResponse, Portfol
         </div>
       </div>
 
+      <div *ngIf="snapshotTrendPoints.length > 0" class="bg-slate-800/70 rounded-xl p-6 border border-slate-700 mb-8">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xl font-semibold text-white">Snapshot Trend (Total Value)</h2>
+          <p class="text-xs text-slate-400">{{ snapshotTrendPoints.length }} points</p>
+        </div>
+        <svg viewBox="0 0 100 40" preserveAspectRatio="none" class="w-full h-32">
+          <polyline
+            [attr.points]="trendPolylinePoints"
+            fill="none"
+            stroke="#22d3ee"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          ></polyline>
+        </svg>
+        <div class="flex justify-between text-xs text-slate-400 mt-2">
+          <span>{{ snapshotTrendStartLabel }}</span>
+          <span>{{ snapshotTrendEndLabel }}</span>
+        </div>
+      </div>
+
       <div *ngIf="loading" class="space-y-4">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div *ngFor="let i of [1,2,3]" class="bg-slate-800/70 rounded-xl p-6 border border-slate-700 animate-pulse">
@@ -290,6 +311,7 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
   compareToSnapshotId = '';
   snapshots: PortfolioSnapshot[] = [];
   snapshotCompare: PortfolioSnapshotCompareResponse | null = null;
+  snapshotTrendPoints: PortfolioSnapshotTrendPoint[] = [];
   compareLoading = false;
   savingSnapshot = false;
 
@@ -403,13 +425,33 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
       next: snapshots => {
         this.snapshots = [...snapshots].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
         this.setDefaultCompareSnapshotIds();
+        this.loadSnapshotTrend();
       },
       error: () => {
         this.snapshots = [];
         this.compareFromSnapshotId = '';
         this.compareToSnapshotId = '';
+        this.snapshotTrendPoints = [];
       }
     });
+  }
+
+  private loadSnapshotTrend(): void {
+    if (!this.selectedPortfolioId) {
+      this.snapshotTrendPoints = [];
+      return;
+    }
+    this.portfolioService
+      .getPortfolioSnapshotTrend(this.selectedPortfolioId, 30)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: trend => {
+          this.snapshotTrendPoints = trend.points ?? [];
+        },
+        error: () => {
+          this.snapshotTrendPoints = [];
+        }
+      });
   }
 
   get canRunCompare(): boolean {
@@ -597,6 +639,35 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
 
   signedNumber(value: number): string {
     return `${value >= 0 ? '+' : '-'}${Math.abs(value).toFixed(2)}`;
+  }
+
+  get trendPolylinePoints(): string {
+    if (this.snapshotTrendPoints.length <= 1) {
+      return '';
+    }
+
+    const values = this.snapshotTrendPoints.map(p => p.totalPortfolioValue);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+
+    return this.snapshotTrendPoints
+      .map((point, idx) => {
+        const x = (idx / (this.snapshotTrendPoints.length - 1)) * 100;
+        const y = 40 - (((point.totalPortfolioValue - min) / range) * 36 + 2);
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+      })
+      .join(' ');
+  }
+
+  get snapshotTrendStartLabel(): string {
+    if (!this.snapshotTrendPoints.length) return '';
+    return this.snapshotTrendPoints[0].createdAt.toLocaleDateString();
+  }
+
+  get snapshotTrendEndLabel(): string {
+    if (!this.snapshotTrendPoints.length) return '';
+    return this.snapshotTrendPoints[this.snapshotTrendPoints.length - 1].createdAt.toLocaleDateString();
   }
 
   ngOnDestroy(): void {
