@@ -225,4 +225,31 @@ describe('AdminDashboardComponent', () => {
     expect(component.activityStartDate).toBe('');
     expect(component.activityEndDate).toBe('');
   });
+
+  it('buildAuditLogCsv should create escaped csv rows', () => {
+    const csv = component.buildAuditLogCsv([
+      {
+        id: 'id-1',
+        actorUserId: 'admin-1',
+        action: 'USER_ROLE_UPDATED',
+        entityType: 'user',
+        entityId: 'u-1',
+        beforeJson: '{"role":"USER"}',
+        afterJson: '{"role":"ADMIN"}',
+        createdAt: new Date('2026-04-29T12:00:00.000Z'),
+      },
+    ]);
+
+    expect(csv).toContain('timestamp,actor_user_id,action,entity_type,entity_id,before_json,after_json');
+    expect(csv).toContain('"2026-04-29T12:00:00.000Z","admin-1","USER_ROLE_UPDATED","user","u-1","{""role"":""USER""}","{""role"":""ADMIN""}"');
+  });
+
+  it('exportFilteredAuditLogsCsv should set error when there are no rows', () => {
+    component.auditLogs = [];
+    component.activitySearchTerm = 'nothing';
+
+    component.exportFilteredAuditLogsCsv();
+
+    expect(component.errorMessage).toContain('No activity logs');
+  });
 });
