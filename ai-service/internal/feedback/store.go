@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 )
@@ -298,10 +297,9 @@ func (s *MemoryStore) Export(w io.Writer) error {
 	return nil
 }
 
-// ---- process-wide default store (env-configurable) ----
+// ---- process-wide default store ----
 
 const (
-	envFeedbackPath  = "WEALTHSCOPE_FEEDBACK_PATH"
 	defaultLogPath   = "data/feedback.jsonl"
 )
 
@@ -311,9 +309,8 @@ var (
 	defaultStoreMu   sync.RWMutex
 )
 
-// DefaultStore returns the process-wide store, lazily initialising it from
-// env (`WEALTHSCOPE_FEEDBACK_PATH`) on first use. Override with SetDefaultStore
-// in tests.
+// DefaultStore returns the process-wide store, lazily initialising with
+// default path. Startup wiring can override this via SetDefaultStore.
 func DefaultStore() Store {
 	defaultStoreOnce.Do(func() {
 		defaultStoreMu.Lock()
@@ -321,11 +318,7 @@ func DefaultStore() Store {
 		if defaultStore != nil {
 			return
 		}
-		path := strings.TrimSpace(os.Getenv(envFeedbackPath))
-		if path == "" {
-			path = defaultLogPath
-		}
-		defaultStore = NewJSONLStore(path)
+		defaultStore = NewJSONLStore(defaultLogPath)
 	})
 	defaultStoreMu.RLock()
 	defer defaultStoreMu.RUnlock()

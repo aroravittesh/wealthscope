@@ -12,6 +12,7 @@ import (
 
 // QADatasetPathOverride, when non-empty, is used instead of env and default search (tests only).
 var QADatasetPathOverride string
+var qaDatasetPathConfigured string
 
 var overrideMu sync.Mutex
 
@@ -27,6 +28,15 @@ func SetQADatasetPathForTest(path string) {
 func ClearQADatasetPathOverride() {
 	overrideMu.Lock()
 	QADatasetPathOverride = ""
+	overrideMu.Unlock()
+	ResetQALoaderForTest()
+}
+
+// SetQADatasetPath configures the primary dataset path from startup config.
+// Empty value keeps default search behavior.
+func SetQADatasetPath(path string) {
+	overrideMu.Lock()
+	qaDatasetPathConfigured = strings.TrimSpace(path)
 	overrideMu.Unlock()
 	ResetQALoaderForTest()
 }
@@ -63,7 +73,7 @@ func resolveQADatasetPath() string {
 	if o != "" {
 		return o
 	}
-	if p := strings.TrimSpace(os.Getenv("WEALTHSCOPE_QA_DATASET_PATH")); p != "" {
+	if p := strings.TrimSpace(qaDatasetPathConfigured); p != "" {
 		return p
 	}
 	candidates := []string{

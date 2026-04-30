@@ -3,18 +3,9 @@ package websearch
 import (
 	"context"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
-)
-
-// Environment variable names. WEALTHSCOPE_WEB_SEARCH_PROVIDER explicitly picks
-// a provider ("tavily" | "stub" | "off"); when unset we autodetect from the
-// presence of provider-specific API keys.
-const (
-	EnvProvider     = "WEALTHSCOPE_WEB_SEARCH_PROVIDER"
-	EnvTavilyAPIKey = "TAVILY_API_KEY"
 )
 
 // StubProvider is the no-op provider used when web search is disabled or
@@ -77,13 +68,7 @@ var (
 )
 
 // DefaultProvider returns the process-wide provider, lazily initialising it
-// from environment on first use:
-//
-//   - WEALTHSCOPE_WEB_SEARCH_PROVIDER=off  → StubProvider
-//   - WEALTHSCOPE_WEB_SEARCH_PROVIDER=stub → StubProvider
-//   - WEALTHSCOPE_WEB_SEARCH_PROVIDER=tavily and TAVILY_API_KEY set → TavilyProvider
-//   - Unset and TAVILY_API_KEY set → TavilyProvider
-//   - Otherwise → StubProvider
+// from config wiring on first use. If unset, StubProvider is used.
 func DefaultProvider() Provider {
 	defaultProviderOnce.Do(func() {
 		defaultProviderMu.Lock()
@@ -91,11 +76,26 @@ func DefaultProvider() Provider {
 		if defaultProvider != nil {
 			return
 		}
-		defaultProvider = providerFromEnv()
+		defaultProvider = StubProvider{}
 	})
 	defaultProviderMu.RLock()
 	defer defaultProviderMu.RUnlock()
 	return defaultProvider
+}
+
+type ProviderConfig struct {
+	Provider  string
+	TavilyKey string
+	Timeout   time.Duration
+}
+
+// SetDefaultProviderFromConfig wires the provider based on startup config.
+// Supported providers: tavily, stub/off/none/disabled.
+func SetDefaultProviderFromConfig(cfg ProviderConfig) {
+	defaultProviderMu.Lock()
+	defer defaultProviderMu.Unlock()
+	defaultProvider = providerFromConfig(cfg)
+	defaultProviderOnce.Do(func() {})
 }
 
 // SetDefaultProviderForTest overrides the process-wide provider. Returns a
@@ -115,9 +115,13 @@ func SetDefaultProviderForTest(p Provider) (cleanup func()) {
 	}
 }
 
-func providerFromEnv() Provider {
-	choice := strings.ToLower(strings.TrimSpace(os.Getenv(EnvProvider)))
-	tavilyKey := strings.TrimSpace(os.Getenv(EnvTavilyAPIKey))
+func providerFromConfig(cfg ProviderConfig) Provider {
+	choice := strings.ToLower(strings.TrimSpace(cfg.Provider))
+	tavilyKey := strings.TrimSpace(cfg.TavilyKey)
+	timeout := cfg.Timeout
+	if timeout <= 0 {
+		timeout = 4 * time.Second
+	}
 
 	switch choice {
 	case "off", "stub", "none", "disabled":
@@ -126,12 +130,12 @@ func providerFromEnv() Provider {
 		if tavilyKey == "" {
 			return StubProvider{}
 		}
-		return NewTavilyProvider(tavilyKey, &http.Client{Timeout: 4 * time.Second})
+		return NewTavilyProvider(tavilyKey, &http.Client{Timeout: timeout})
 	}
 
-	// Auto-detect.
+	// Auto-detect when provider omitted.
 	if tavilyKey != "" {
-		return NewTavilyProvider(tavilyKey, &http.Client{Timeout: 4 * time.Second})
+		return NewTavilyProvider(tavilyKey, &http.Client{Timeout: timeout})
 	}
 	return StubProvider{}
 }

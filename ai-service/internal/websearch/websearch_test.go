@@ -195,26 +195,20 @@ func TestTavilyProvider_MissingAPIKeyErrors(t *testing.T) {
 // ---- Provider selection ----
 
 func TestProviderFromEnv_StubByDefault(t *testing.T) {
-	t.Setenv(EnvProvider, "")
-	t.Setenv(EnvTavilyAPIKey, "")
-	p := providerFromEnv()
+	p := providerFromConfig(ProviderConfig{})
 	if p.Name() != "stub" {
 		t.Fatalf("want stub got %s", p.Name())
 	}
 }
 
 func TestProviderFromEnv_ExplicitOff(t *testing.T) {
-	t.Setenv(EnvProvider, "off")
-	t.Setenv(EnvTavilyAPIKey, "k")
-	if p := providerFromEnv(); p.Name() != "stub" {
+	if p := providerFromConfig(ProviderConfig{Provider: "off", TavilyKey: "k"}); p.Name() != "stub" {
 		t.Fatalf("want stub got %s", p.Name())
 	}
 }
 
 func TestProviderFromEnv_AutoTavilyWhenKeyPresent(t *testing.T) {
-	t.Setenv(EnvProvider, "")
-	t.Setenv(EnvTavilyAPIKey, "tv-key")
-	if p := providerFromEnv(); p.Name() != "tavily" {
+	if p := providerFromConfig(ProviderConfig{TavilyKey: "tv-key"}); p.Name() != "tavily" {
 		t.Fatalf("want tavily got %s", p.Name())
 	}
 }

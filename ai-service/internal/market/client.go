@@ -1,11 +1,11 @@
 package market
 
 import (
-    "encoding/json"
-    "errors"
-    "fmt"
-    "net/http"
-    "os"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"strings"
 )
 
 type GlobalQuote struct {
@@ -50,11 +50,24 @@ type NewsResponse struct {
     Articles []NewsItem `json:"articles"`
 }
 
+type Config struct {
+	AlphaVantageAPIKey string
+	NewsAPIKey         string
+}
+
+var cfg Config
+
+func SetConfig(c Config) {
+	cfg = Config{
+		AlphaVantageAPIKey: strings.TrimSpace(c.AlphaVantageAPIKey),
+		NewsAPIKey:         strings.TrimSpace(c.NewsAPIKey),
+	}
+}
+
 func GetStockQuote(symbol string) (*GlobalQuote, error) {
-    apiKey := os.Getenv("ALPHA_VANTAGE_API_KEY")
     url := fmt.Sprintf(
         "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=%s&apikey=%s",
-        symbol, apiKey,
+        symbol, cfg.AlphaVantageAPIKey,
     )
     resp, err := http.Get(url)
     if err != nil {
@@ -73,10 +86,9 @@ func GetStockQuote(symbol string) (*GlobalQuote, error) {
 }
 
 func GetCompanyOverview(symbol string) (*CompanyOverview, error) {
-    apiKey := os.Getenv("ALPHA_VANTAGE_API_KEY")
     url := fmt.Sprintf(
         "https://www.alphavantage.co/query?function=OVERVIEW&symbol=%s&apikey=%s",
-        symbol, apiKey,
+        symbol, cfg.AlphaVantageAPIKey,
     )
     resp, err := http.Get(url)
     if err != nil {
@@ -95,10 +107,9 @@ func GetCompanyOverview(symbol string) (*CompanyOverview, error) {
 }
 
 func GetMarketNews(ticker string) ([]NewsItem, error) {
-    apiKey := os.Getenv("NEWS_API_KEY")
     url := fmt.Sprintf(
         "https://newsapi.org/v2/everything?q=%s+stock&sortBy=publishedAt&pageSize=5&apiKey=%s",
-        ticker, apiKey,
+        ticker, cfg.NewsAPIKey,
     )
     resp, err := http.Get(url)
     if err != nil {

@@ -1,11 +1,17 @@
 package main
 
 import (
-	"os"
+	"log"
+	"net/http"
 
+	"wealthscope-ai/internal/config"
+	"wealthscope-ai/internal/feedback"
 	"wealthscope-ai/internal/handler"
 	"wealthscope-ai/internal/market"
 	"wealthscope-ai/internal/ml"
+	"wealthscope-ai/internal/openai"
+	"wealthscope-ai/internal/rag"
+	"wealthscope-ai/internal/websearch"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -13,7 +19,36 @@ import (
 
 func main() {
 
-    godotenv.Load()
+    _ = godotenv.Load()
+	cfg, err := config.LoadFromEnv()
+	if err != nil {
+		log.Fatalf("config load failed: %v", err)
+	}
+
+	// Startup wiring from centralized config.
+	openai.SetAPIKey(cfg.OpenAI.APIKey)
+	openai.SetDefaultStore(openai.NewStore(openai.StoreConfig{
+		TTL:              cfg.Session.TTL,
+		MaxMessages:      cfg.Session.MaxMessages,
+		KeepAfterCompact: cfg.Session.KeepAfterCompact,
+	}))
+	market.SetConfig(market.Config{
+		AlphaVantageAPIKey: cfg.Market.AlphaVantageAPIKey,
+		NewsAPIKey:         cfg.Market.NewsAPIKey,
+	})
+	ml.SetDefaultIntentConfig(ml.IntentConfig{
+		ClassifierBaseURL: cfg.Intent.ClassifierURL,
+		Client:            &http.Client{Timeout: cfg.Intent.Timeout},
+		MinConfidence:     cfg.Intent.MinConfidence,
+	})
+	rag.SetQADatasetPath(cfg.RAG.QADatasetPath)
+	feedback.SetDefaultStore(feedback.NewJSONLStore(cfg.Feedback.Path))
+	websearch.SetDefaultProviderFromConfig(websearch.ProviderConfig{
+		Provider:  cfg.WebSearch.Provider,
+		TavilyKey: cfg.WebSearch.TavilyAPIKey,
+		Timeout:   cfg.WebSearch.Timeout,
+	})
+	log.Printf("config loaded: %s", cfg.SafeSummary())
 
     router := gin.Default()
     router.SetTrustedProxies(nil)
@@ -140,10 +175,5 @@ router.DELETE("/chat/session/:session_id", handler.ClearChatHandler)
         handler.RespondSuccess(c, 200, "Intent detected", result)
     })
 
-    port := os.Getenv("PORT")
-    if port == "" {
-        port = "9000"
-    }
-
-    router.Run(":" + port)
+    router.Run(":" + cfg.Server.Port)
 }

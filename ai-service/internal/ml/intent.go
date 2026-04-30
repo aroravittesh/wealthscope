@@ -3,7 +3,6 @@ package ml
 import (
 	"context"
 	"net/http"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -53,14 +52,25 @@ type IntentConfig struct {
 	MinConfidence     float64
 }
 
-// DefaultIntentConfig reads INTENT_CLASSIFIER_URL and INTENT_MIN_CONFIDENCE.
+var intentDefaultConfig = IntentConfig{
+	Client:        &http.Client{Timeout: 5 * time.Second},
+	MinConfidence: 0,
+}
+
+// DefaultIntentConfig returns process-wide intent classifier settings.
 func DefaultIntentConfig() IntentConfig {
-	u := strings.TrimSpace(os.Getenv("INTENT_CLASSIFIER_URL"))
-	return IntentConfig{
-		ClassifierBaseURL: strings.TrimSuffix(u, "/"),
-		Client:            &http.Client{Timeout: 5 * time.Second},
-		MinConfidence:     parseMinConfidence(os.Getenv("INTENT_MIN_CONFIDENCE")),
+	cfg := intentDefaultConfig
+	if cfg.Client == nil {
+		cfg.Client = &http.Client{Timeout: 5 * time.Second}
 	}
+	cfg.ClassifierBaseURL = strings.TrimSuffix(strings.TrimSpace(cfg.ClassifierBaseURL), "/")
+	cfg.MinConfidence = clamp01(cfg.MinConfidence)
+	return cfg
+}
+
+// SetDefaultIntentConfig updates process-wide default intent config from startup wiring.
+func SetDefaultIntentConfig(cfg IntentConfig) {
+	intentDefaultConfig = cfg
 }
 
 // parseMinConfidence clamps an env-provided threshold to [0,1]; invalid → 0.
@@ -77,6 +87,16 @@ func parseMinConfidence(raw string) float64 {
 		return 1
 	}
 	return f
+}
+
+func clamp01(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1
+	}
+	return v
 }
 
 var intentKeywords = map[Intent][]string{

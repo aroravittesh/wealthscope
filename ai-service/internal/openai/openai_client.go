@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 )
@@ -30,7 +29,13 @@ type OpenAIResponse struct {
 var (
 	chatHTTPClient      *http.Client
 	chatCompletionsURL  = "https://api.openai.com/v1/chat/completions"
+	openAIAPIKey        string
 )
+
+// SetAPIKey sets the API key used by CallOpenAI.
+func SetAPIKey(key string) {
+	openAIAPIKey = strings.TrimSpace(key)
+}
 
 func chatHTTP() *http.Client {
 	if chatHTTPClient != nil {
@@ -133,7 +138,7 @@ func CallOpenAI(sessionID string, userInput string) (string, error) {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+os.Getenv("OPENAI_API_KEY"))
+	req.Header.Set("Authorization", "Bearer "+openAIAPIKey)
 
 	resp, err := chatHTTP().Do(req)
 	if err != nil {
