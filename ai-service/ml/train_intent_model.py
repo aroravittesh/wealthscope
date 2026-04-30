@@ -1,18 +1,25 @@
 """
-Train TF-IDF + Logistic Regression intent classifier and save sklearn artifacts.
+FINAL Optimized Training Script
+- Removes duplicates
+- Uses Stratified Cross Validation
+- Uses GridSearchCV with f1_macro
+- No train/test leakage
 """
+
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 from pathlib import Path
 
+import pandas as pd
 import joblib
+
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score
-from sklearn.model_selection import train_test_split
+
 
 LABEL_ORDER = [
     "STOCK_PRICE",
@@ -24,89 +31,88 @@ LABEL_ORDER = [
 ]
 
 
-def load_rows(csv_path: Path) -> tuple[list[str], list[str]]:
-    texts: list[str] = []
-    labels: list[str] = []
-    with csv_path.open(newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        fields = [h.strip() for h in (reader.fieldnames or [])]
-        if fields != ["text", "label"]:
-            raise ValueError(f"Expected header text,label got {reader.fieldnames}")
-        for row in reader:
-            t = (row.get("text") or "").strip()
-            lab = (row.get("label") or "").strip()
-            if not t or not lab:
-                continue
-            if lab not in LABEL_ORDER:
-                raise ValueError(f"Unknown label {lab!r}")
-            texts.append(t)
-            labels.append(lab)
-    if len(texts) < 10:
-        raise ValueError("Need at least 10 labeled rows")
-    return texts, labels
+def train_and_save(data_path: Path, out_dir: Path):
 
+    # ======================
+    # 1. LOAD + CLEAN DATA
+    # ======================
+    df = pd.read_csv(data_path)
 
-def train_and_save(data_path: Path, out_dir: Path, *, verbose: bool = True) -> None:
-    texts, y = load_rows(data_path)
-    x_train, x_test, y_train, y_test = train_test_split(
-        texts,
-        y,
-        test_size=0.2,
-        random_state=42,
-        stratify=y,
+    # 🔥 remove duplicates
+    df = df.drop_duplicates(subset=["text"])
+
+    texts = df["text"].str.lower().tolist()
+    labels = df["label"].tolist()
+
+    print(f"Dataset size after cleaning: {len(texts)}")
+
+    # ======================
+    # 2. PIPELINE
+    # ======================
+    pipeline = Pipeline([
+        ("tfidf", TfidfVectorizer()),
+        ("clf", LogisticRegression(max_iter=2000))
+    ])
+
+    # ======================
+    # 3. PARAM GRID
+    # ======================
+    param_grid = {
+        "tfidf__ngram_range": [(1, 1), (1, 2)],
+        "tfidf__min_df": [1, 2],
+        "tfidf__max_df": [0.85, 0.95, 1.0],
+        "tfidf__max_features": [5000, 8000],
+
+        "clf__C": [0.5, 1, 2, 5],
+        "clf__solver": ["lbfgs"],
+        "clf__class_weight": ["balanced"]
+    }
+
+    # ======================
+    # 4. STRATIFIED CV
+    # ======================
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+    grid = GridSearchCV(
+        pipeline,
+        param_grid,
+        cv=cv,
+        n_jobs=-1,
+        verbose=2,
+        scoring="f1_macro"
     )
 
-    vectorizer = TfidfVectorizer(
-        ngram_range=(1, 2),
-        min_df=1,
-        max_features=8000,
-        sublinear_tf=True,
-    )
-    x_train_v = vectorizer.fit_transform(x_train)
-    x_test_v = vectorizer.transform(x_test)
+    # ======================
+    # 5. TRAIN
+    # ======================
+    grid.fit(texts, labels)
 
-    model = LogisticRegression(
-        max_iter=2000,
-        class_weight="balanced",
-        random_state=42,
-    )
-    model.fit(x_train_v, y_train)
-    pred = model.predict(x_test_v)
+    best_model = grid.best_estimator_
 
-    if verbose:
-        acc = accuracy_score(y_test, pred)
-        macro_f1 = f1_score(y_test, pred, average="macro", labels=LABEL_ORDER, zero_division=0)
-        print(f"Accuracy: {acc:.4f}")
-        print(f"Macro F1: {macro_f1:.4f}")
-        print("\nClassification report:")
-        print(classification_report(y_test, pred, labels=LABEL_ORDER, zero_division=0))
-        cm = confusion_matrix(y_test, pred, labels=LABEL_ORDER)
-        print("\nConfusion matrix (rows=true, cols=pred):")
-        print(cm)
+    print("\n🔥 Best Params:", grid.best_params_)
+    print("🔥 Best CV Score (Macro F1):", grid.best_score_)
 
+    # ======================
+    # 6. SAVE MODEL
+    # ======================
     out_dir.mkdir(parents=True, exist_ok=True)
-    joblib.dump(vectorizer, out_dir / "intent_vectorizer.joblib")
-    joblib.dump(model, out_dir / "intent_model.joblib")
-    with (out_dir / "intent_labels.json").open("w", encoding="utf-8") as f:
+
+    joblib.dump(best_model.named_steps["tfidf"], out_dir / "intent_vectorizer.joblib")
+    joblib.dump(best_model.named_steps["clf"], out_dir / "intent_model.joblib")
+
+    with (out_dir / "intent_labels.json").open("w") as f:
         json.dump({"labels": LABEL_ORDER}, f, indent=2)
-    if verbose:
-        print(f"\nWrote artifacts to {out_dir}")
+
+    print("\n✅ FINAL optimized model saved!")
 
 
-def main() -> None:
+def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--data",
-        type=Path,
-        default=Path(__file__).resolve().parent / "intent_dataset.csv",
-    )
-    parser.add_argument(
-        "--out-dir",
-        type=Path,
-        default=Path(__file__).resolve().parent,
-    )
+    parser.add_argument("--data", type=Path, default="augmented_dataset.csv")
+    parser.add_argument("--out-dir", type=Path, default=".")
     args = parser.parse_args()
-    train_and_save(args.data, args.out_dir, verbose=True)
+
+    train_and_save(args.data, args.out_dir)
 
 
 if __name__ == "__main__":

@@ -93,11 +93,29 @@ import { User } from '../models';
             class="flex items-center gap-3 cursor-pointer group"
             [routerLink]="isAuthenticated ? '/dashboard' : '/'"
           >
-            <img
-  src="/aurex.png"
-  alt="Aurex"
-  class="h-16 sm:h-14 md:h-16 w-auto max-w-[14rem] object-contain object-left transition-transform duration-300 group-hover:scale-105"
-/>
+            <!-- Animated Logo Container -->
+            <div class="flex items-center gap-2 transition-transform duration-300 group-hover:scale-105">
+              <!-- Geometric Icon with Moving Pattern -->
+              <div class="relative flex items-center justify-center h-10 w-10 rounded-xl shadow-lg shadow-blue-500/30 overflow-hidden shrink-0">
+                <div class="absolute inset-0 bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-600 animate-gradient-x opacity-90"></div>
+                <div class="absolute inset-[2px] bg-slate-800 rounded-lg z-0"></div>
+                <svg class="relative z-10 w-6 h-6 text-transparent animate-spin-slow drop-shadow-[0_0_8px_rgba(59,130,246,0.8)]" style="fill: url(#logoGradient);" viewBox="0 0 24 24">
+                  <defs>
+                    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#60A5FA" />
+                      <stop offset="50%" stop-color="#818CF8" />
+                      <stop offset="100%" stop-color="#C084FC" />
+                    </linearGradient>
+                  </defs>
+                  <path d="M12 2L3 21h4.5l1.5-4h6l1.5 4H21L12 2zm0 4.5l2.5 7h-5L12 6.5z" stroke="url(#logoGradient)" stroke-width="1" stroke-linejoin="round" fill="url(#logoGradient)"/>
+                </svg>
+              </div>
+              
+              <!-- Text with Moving Gradient Pattern -->
+              <span class="text-2xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400 animate-gradient-x drop-shadow-sm hidden sm:block">
+                Aurex
+              </span>
+            </div>
           </div>
 
           <div *ngIf="isAuthenticated; else publicNav" class="hidden md:flex items-center gap-8">
@@ -139,6 +157,29 @@ import { User } from '../models';
     </nav>
   `,
   styles: [`
+    @keyframes gradient-x {
+      0%, 100% {
+        background-size: 200% 200%;
+        background-position: left center;
+      }
+      50% {
+        background-size: 200% 200%;
+        background-position: right center;
+      }
+    }
+    .animate-gradient-x {
+      animation: gradient-x 3s ease infinite;
+    }
+
+    @keyframes spin-slow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .animate-spin-slow {
+      animation: spin-slow 12s linear infinite;
+    }
+
+
     .logo-blend {
       mix-blend-mode: screen;
       opacity: 0.95;
@@ -161,11 +202,11 @@ export class NavbarComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.authService.isAuthenticated$.subscribe(isAuth => {
+    this.authService.isAuthenticated$.subscribe((isAuth: boolean) => {
       this.isAuthenticated = isAuth;
     });
 
-    this.authService.currentUser$.subscribe(user => {
+    this.authService.currentUser$.subscribe((user: User | null) => {
       this.currentUser = user;
     });
   }
