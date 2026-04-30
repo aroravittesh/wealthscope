@@ -13,7 +13,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 # ======================
-# MODEL DEFINITION
+# MODEL DEFINITION (UNCHANGED)
 # ======================
 class Transformer(nn.Module):
     def __init__(self):
@@ -84,14 +84,14 @@ def get_latest_features(stock, seq_len=60):
 
 
 # ======================
-# HELPER
+# HELPER FUNCTIONS
 # ======================
 def sharpe_ratio(returns):
     return np.mean(returns) / (np.std(returns) + 1e-6)
 
 
 # ======================
-# MAIN FUNCTION (OPTIMIZED)
+# MAIN RECOMMEND FUNCTION (OPTIMIZED)
 # ======================
 def recommend(user_portfolio, risk="medium", horizon="long", top_n=5):
 
@@ -111,6 +111,7 @@ def recommend(user_portfolio, risk="medium", horizon="long", top_n=5):
 
         try:
             X = get_latest_features(s)
+
             if X is None:
                 continue
 
@@ -118,6 +119,7 @@ def recommend(user_portfolio, risk="medium", horizon="long", top_n=5):
                 pred_scaled = model(X).item()
 
             df = yf.download(s, period="2y", progress=False)
+
             returns = df["Close"].squeeze().pct_change().dropna()
 
             if len(returns) == 0:
@@ -132,42 +134,32 @@ def recommend(user_portfolio, risk="medium", horizon="long", top_n=5):
             )
 
             # ======================
-            # 🔥 NORMALIZATION
+            # 🔥 OPTIMIZED SCORING
             # ======================
             norm_momentum = np.tanh(momentum)
             norm_sharpe = np.tanh(sharpe)
             norm_pred = np.tanh(pred_scaled)
 
-            # ======================
-            # 🔥 SCORING (CLIPPED)
-            # ======================
-            raw_score = (
-                0.4 * norm_momentum +
-                0.35 * norm_sharpe +
-                0.25 * norm_pred
-            )
+            score = 0.4 * norm_momentum + 0.35 * norm_sharpe + 0.25 * norm_pred
 
             # Risk adjustment
             if risk == "low":
-                raw_score -= 1.2 * vol
+                score -= 1.2 * vol
             elif risk == "high":
-                raw_score += 0.6 * vol
+                score += 0.6 * vol
 
             # Horizon adjustment
             if horizon == "long":
-                raw_score += 0.4 * norm_sharpe
+                score += 0.4 * norm_sharpe
             elif horizon == "short":
-                raw_score += 0.3 * norm_momentum
-
-            # Final score (0–1)
-            score = float(np.clip(raw_score, 0, 1))
+                score += 0.3 * norm_momentum
 
             # ======================
-            # 🔥 DECISION LOGIC
+            # 🔥 IMPROVED DECISION
             # ======================
-            if score > 0.65:
+            if score > 0.6:
                 decision = "BUY"
-            elif score > 0.4:
+            elif score > 0.35:
                 decision = "HOLD"
             else:
                 decision = "AVOID"
