@@ -38,7 +38,7 @@ def train_and_save(data_path: Path, out_dir: Path):
     # ======================
     df = pd.read_csv(data_path)
 
-    # 🔥 remove duplicates (CRITICAL)
+    # 🔥 remove duplicates
     df = df.drop_duplicates(subset=["text"])
 
     texts = df["text"].str.lower().tolist()
@@ -58,13 +58,13 @@ def train_and_save(data_path: Path, out_dir: Path):
     # 3. PARAM GRID
     # ======================
     param_grid = {
-        "tfidf__ngram_range": [(1,1), (1,2)],
+        "tfidf__ngram_range": [(1, 1), (1, 2)],
         "tfidf__min_df": [1, 2],
         "tfidf__max_df": [0.85, 0.95, 1.0],
         "tfidf__max_features": [5000, 8000],
 
         "clf__C": [0.5, 1, 2, 5],
-        "clf__solver": ["lbfgs"],  # 🔥 avoid liblinear warning
+        "clf__solver": ["lbfgs"],
         "clf__class_weight": ["balanced"]
     }
 

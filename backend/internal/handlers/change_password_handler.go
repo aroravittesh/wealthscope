@@ -4,9 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"wealthscope-backend/internal/services"
 	"wealthscope-backend/internal/middleware"
-
+	"wealthscope-backend/internal/services"
 )
 
 type changePasswordRequest struct {

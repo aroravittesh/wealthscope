@@ -89,6 +89,58 @@ export interface PortfolioSummary {
   assetAllocation: AssetAllocationRow[];
 }
 
+export interface PortfolioSnapshot {
+  id: string;
+  portfolioId: string;
+  portfolioName?: string;
+  createdAt: Date;
+  summary: PortfolioSummary;
+}
+
+export interface SnapshotDelta {
+  absolute: number;
+  percent: number;
+}
+
+export interface AllocationDriftRow {
+  symbol: string;
+  fromPercent: number;
+  toPercent: number;
+  deltaPercent: number;
+  fromValue: number;
+  toValue: number;
+  deltaValue: number;
+}
+
+export interface PortfolioSnapshotCompareResponse {
+  portfolioId: string;
+  fromId: string;
+  toId: string;
+  fromAt: Date;
+  toAt: Date;
+  totalValueDelta: SnapshotDelta;
+  totalInvestedDelta: SnapshotDelta;
+  profitLossDelta: SnapshotDelta;
+  diversificationDelta: SnapshotDelta;
+  volatilityDelta: SnapshotDelta;
+  allocationDrift: AllocationDriftRow[];
+}
+
+export interface PortfolioSnapshotTrendPoint {
+  snapshotId: string;
+  createdAt: Date;
+  totalPortfolioValue: number;
+  totalInvested: number;
+  totalProfitLoss: number;
+  diversification: number;
+  volatility: number;
+}
+
+export interface PortfolioSnapshotTrendResponse {
+  portfolioId: string;
+  points: PortfolioSnapshotTrendPoint[];
+}
+
 export interface ChartData {
   labels: string[];
   datasets: {

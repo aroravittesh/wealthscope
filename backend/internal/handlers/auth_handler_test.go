@@ -49,8 +49,16 @@ func (f *fakeUserRepo) UpdateRiskPreference(userID string, riskPreference string
 	return nil
 }
 
+func (f *fakeUserRepo) ListAllPublic() ([]models.UserPublic, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (f *fakeUserRepo) UpdateRole(userID string, role string) error {
+	return nil
+}
+
 type fakeRefreshTokenRepo struct {
-	createFn   func(t *repository.RefreshToken) error
+	createFn    func(t *repository.RefreshToken) error
 	lastCreated *repository.RefreshToken
 }
 
@@ -235,4 +243,3 @@ func TestAuthHandler_Login_InvalidCredentials(t *testing.T) {
 func contains(s, substr string) bool {
 	return len(substr) == 0 || (len(s) >= len(substr) && bytes.Contains([]byte(s), []byte(substr)))
 }
-

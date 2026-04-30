@@ -28,6 +28,9 @@ func main() {
 	userRepo := repository.NewUserRepository(database)
 	portfolioRepo := repository.NewPortfolioRepository(database)
 	holdingRepo := repository.NewHoldingRepository(database)
+	assetRepo := repository.NewAssetRepository(database)
+	snapshotRepo := repository.NewPortfolioSnapshotRepository(database)
+	auditLogRepo := repository.NewAuditLogRepository(database)
 
 	portfolioService := &services.PortfolioService{
 		PortfolioRepo: portfolioRepo,
@@ -60,6 +63,13 @@ func main() {
 	}
 	aiGatewayService := services.NewAIGatewayService(aiServiceURL)
 	aiHandler := handlers.NewAIHandler(aiGatewayService)
+
+	adminHandler := handlers.NewAdminHandler(userRepo, assetRepo, auditLogRepo)
+	reportingHandler := handlers.NewReportingHandler(portfolioService, snapshotRepo)
+
+	adminOnly := func(h http.HandlerFunc) http.Handler {
+		return middleware.AuthMiddleware(middleware.RequireRole("ADMIN")(h))
+	}
 
 	router := mux.NewRouter()
 
@@ -121,6 +131,35 @@ func main() {
 		middleware.AuthMiddleware(http.HandlerFunc(portfolioHandler.GetSummary)),
 	).Methods("GET")
 
+	api.Handle(
+		"/portfolios/{id}/snapshots",
+		middleware.AuthMiddleware(http.HandlerFunc(reportingHandler.CreatePortfolioSnapshot)),
+	).Methods("POST")
+
+	api.Handle(
+		"/portfolios/{id}/snapshots",
+		middleware.AuthMiddleware(http.HandlerFunc(reportingHandler.ListPortfolioSnapshots)),
+	).Methods("GET")
+
+	api.Handle(
+		"/portfolios/{id}/snapshots/compare",
+		middleware.AuthMiddleware(http.HandlerFunc(reportingHandler.ComparePortfolioSnapshots)),
+	).Methods("GET")
+
+	api.Handle(
+		"/portfolios/{id}/snapshots/trend",
+		middleware.AuthMiddleware(http.HandlerFunc(reportingHandler.GetPortfolioSnapshotTrend)),
+	).Methods("GET")
+
+	// admin (JWT role ADMIN)
+	api.Handle("/admin/audit-logs", adminOnly(adminHandler.ListAuditLogs)).Methods("GET")
+	api.Handle("/admin/users", adminOnly(adminHandler.ListUsers)).Methods("GET")
+	api.Handle("/admin/users/{id}/role", adminOnly(adminHandler.UpdateUserRole)).Methods("PATCH")
+	api.Handle("/admin/assets", adminOnly(adminHandler.ListAssets)).Methods("GET")
+	api.Handle("/admin/assets", adminOnly(adminHandler.CreateAsset)).Methods("POST")
+	api.Handle("/admin/assets/{id}", adminOnly(adminHandler.UpdateAsset)).Methods("PUT")
+	api.Handle("/admin/assets/{id}", adminOnly(adminHandler.DeleteAsset)).Methods("DELETE")
+
 	// ✅ holdings routes
 	api.Handle(
 		"/holdings",
@@ -151,7 +190,16 @@ func main() {
 	// CORS middleware
 	withCORS := func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4200")
+			origin := r.Header.Get("Origin")
+
+			allowedOrigins := map[string]bool{
+				"http://localhost:4200":          true,
+				"https://aurex-sable.vercel.app": true,
+			}
+
+			if allowedOrigins[origin] {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+			}
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")

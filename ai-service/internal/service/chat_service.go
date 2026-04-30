@@ -1,90 +1,331 @@
 package service
 
 import (
-    "fmt"
-    "strings"
+	"context"
+	"fmt"
+	"strings"
+	"time"
 
-    "wealthscope-ai/internal/market"
-    "wealthscope-ai/internal/ml"
-    "wealthscope-ai/internal/openai"
-    "wealthscope-ai/internal/rag"
+	"wealthscope-ai/internal/chatprompt"
+	"wealthscope-ai/internal/entity"
+	"wealthscope-ai/internal/market"
+	"wealthscope-ai/internal/ml"
+	"wealthscope-ai/internal/openai"
+	"wealthscope-ai/internal/rag"
+	"wealthscope-ai/internal/websearch"
 )
+
+// webSearchTimeout is the per-call ceiling on the live web search step.
+// Failures and timeouts are swallowed so the chat call never blocks on web.
+const webSearchTimeout = 4 * time.Second
+
+// webSearchTopK is the number of cleaned web results we forward into the
+// prompt. Keep this small so the LLM has room for internal grounding.
+const webSearchTopK = 3
+
+// EnvelopeMarketFetchers overrides live market/news HTTP for BuildEnvelopeInputForChat (tests).
+type EnvelopeMarketFetchers struct {
+	GetStockQuote      func(symbol string) (*market.GlobalQuote, error)
+	GetCompanyOverview func(symbol string) (*market.CompanyOverview, error)
+	GetMarketNews      func(symbol string) ([]market.NewsItem, error)
+}
+
+var envelopeMarketFetchers *EnvelopeMarketFetchers
+
+// SetEnvelopeMarketFetchersForTest installs fetcher overrides; pass nil to clear.
+func SetEnvelopeMarketFetchersForTest(f *EnvelopeMarketFetchers) (cleanup func()) {
+	prev := envelopeMarketFetchers
+	envelopeMarketFetchers = f
+	return func() { envelopeMarketFetchers = prev }
+}
+
+func resolveQuoteFn() func(string) (*market.GlobalQuote, error) {
+	if envelopeMarketFetchers != nil && envelopeMarketFetchers.GetStockQuote != nil {
+		return envelopeMarketFetchers.GetStockQuote
+	}
+	return market.GetStockQuote
+}
+
+func resolveOverviewFn() func(string) (*market.CompanyOverview, error) {
+	if envelopeMarketFetchers != nil && envelopeMarketFetchers.GetCompanyOverview != nil {
+		return envelopeMarketFetchers.GetCompanyOverview
+	}
+	return market.GetCompanyOverview
+}
+
+func resolveNewsFn() func(string) ([]market.NewsItem, error) {
+	if envelopeMarketFetchers != nil && envelopeMarketFetchers.GetMarketNews != nil {
+		return envelopeMarketFetchers.GetMarketNews
+	}
+	return market.GetMarketNews
+}
 
 // ChatServiceInterface allows mocking in unit tests
 type ChatServiceInterface interface {
-    ProcessMessage(sessionID string, message string) (string, error)
+	ProcessMessage(sessionID string, message string) (string, error)
 }
 
 type chatService struct{}
 
 func NewChatService() ChatServiceInterface {
-    return &chatService{}
+	return &chatService{}
 }
 
 func (s *chatService) ProcessMessage(sessionID string, message string) (string, error) {
-    return ProcessMessage(sessionID, message)
+	return ProcessMessage(sessionID, message)
+}
+
+type webSearchTrace struct {
+	DecisionUse  bool
+	DecisionWhy  string
+	ProviderName string
+	RawCount     int
+	CleanedCount int
+	Fallback     bool
+	FallbackWhy  string
+}
+
+type chatPipelineTrace struct {
+	FollowUpResolved   bool
+	FollowUpTicker     string
+	FollowUpReason     string
+	EntityPrimary     string
+	EntitySecondaryN  int
+	EntityCompaniesN  int
+	Intent            string
+	IntentConfidence  float64
+	IntentSource      string
+	IntentFallback    bool
+	RAGResults        int
+	RAGUsed           bool
+	QAResults         int
+	QAUsed            bool
+	WebUsed           bool
+	WebResults        int
+	WebFallback       bool
+	WebDecisionReason string
+	WebFallbackReason string
 }
 
 func ProcessMessage(sessionID string, message string) (string, error) {
+	start := time.Now()
+	in, trace := buildEnvelopeInputForChat(sessionID, message)
+	logChatPipelineEnrichment(sessionID, message, trace)
 
-    intentResult := ml.DetectIntent(message)
-    sentiment := ml.AnalyzeSentiment(message)
-    enriched := message
+	enriched := chatprompt.BuildUserContent(in)
+	response, err := openai.CallOpenAI(sessionID, enriched)
+	elapsed := time.Since(start).Milliseconds()
+	if err != nil {
+		logChatEvent("chat_pipeline_failed",
+			"session_id", sessionID,
+			"message_preview", messagePreview(message),
+			"elapsed_ms", elapsed,
+			"error", err,
+		)
+		return "", err
+	}
+	logChatEvent("chat_pipeline_complete",
+		"session_id", sessionID,
+		"message_preview", messagePreview(message),
+		"elapsed_ms", elapsed,
+		"response_chars", len(response),
+	)
+	return response, nil
+}
 
-    docs := rag.Retrieve(message, 3)
-    if len(docs) > 0 {
-        enriched += "\n\n[Relevant Financial Knowledge]"
-        for _, doc := range docs {
-            enriched += fmt.Sprintf("\n- %s", doc.Content)
-        }
-    }
+// BuildEnvelopeInputForChat runs retrieval, optional live market enrichment, and intent/sentiment metadata.
+// Exposed for tests (no OpenAI call).
+func BuildEnvelopeInputForChat(message string) chatprompt.EnvelopeInput {
+	in, _ := buildEnvelopeInputForChat("", message)
+	return in
+}
 
-    if intentResult.Ticker != "" {
-        ticker := intentResult.Ticker
+func buildEnvelopeInputForChat(sessionID, message string) (chatprompt.EnvelopeInput, chatPipelineTrace) {
+	follow := resolveFollowUpContext(sessionID, message)
+	resolvedMessage := applyFollowUpCarryover(message, follow)
 
-        quote, err := market.GetStockQuote(ticker)
-        if err == nil {
-            enriched += fmt.Sprintf(
-                "\n\n[Live Price Data for %s]\nPrice: $%s | High: $%s | Low: $%s | Change: %s (%s) | Volume: %s",
-                quote.Symbol, quote.Price, quote.High, quote.Low,
-                quote.Change, quote.ChangePercent, quote.Volume,
-            )
-        }
+	ent := entity.Extract(resolvedMessage)
+	intentResult := ml.DetectIntent(resolvedMessage)
+	sentiment := ml.AnalyzeSentiment(resolvedMessage)
+	trace := chatPipelineTrace{
+		FollowUpResolved: follow.CarriedTicker != "",
+		FollowUpTicker:   follow.CarriedTicker,
+		FollowUpReason:   follow.Reason,
+		EntityPrimary:    ent.PrimaryTicker,
+		EntitySecondaryN: len(ent.SecondaryTickers),
+		EntityCompaniesN: len(ent.CompanyMatches),
+		Intent:           string(intentResult.Intent),
+		IntentConfidence: intentResult.Confidence,
+		IntentSource:     intentResult.Source,
+		IntentFallback: intentResult.Source == ml.IntentSourceRemoteFallback ||
+			intentResult.Source == ml.IntentSourceLowConfFallback,
+	}
 
-        overview, err := market.GetCompanyOverview(ticker)
-        if err == nil {
-            enriched += fmt.Sprintf(
-                "\n\n[Company Fundamentals]\nName: %s | Sector: %s | Industry: %s\nMarket Cap: $%s | P/E: %s | EPS: %s | Beta: %s\n52W High: $%s | 52W Low: $%s | Dividend Yield: %s | Profit Margin: %s\nDescription: %s",
-                overview.Name, overview.Sector, overview.Industry,
-                overview.MarketCap, overview.PERatio, overview.EPS, overview.Beta,
-                overview.Week52High, overview.Week52Low,
-                overview.DivYield, overview.ProfitMargin,
-                overview.Description,
-            )
-        }
+	var knowledgeLines []string
+	var qaKnowledgeLines []string
+	rctx := rag.RetrievalContextFromEntity(ent)
+	chunks := rag.RetrieveWithContext(resolvedMessage, rctx, 3)
+	for _, ch := range chunks {
+		knowledgeLines = append(knowledgeLines,
+			fmt.Sprintf("[%s] %s", ch.Topic, strings.TrimSpace(ch.Content)))
+	}
+	trace.RAGResults = len(chunks)
+	trace.RAGUsed = len(chunks) > 0
 
-        news, err := market.GetMarketNews(ticker)
-        if err == nil && len(news) > 0 {
-            enriched += fmt.Sprintf("\n\n[Latest News for %s]", ticker)
-            for i, article := range news {
-                if i >= 3 {
-                    break
-                }
-                enriched += fmt.Sprintf(
-                    "\n%d. %s — %s (%s)",
-                    i+1, article.Title, article.Source.Name, article.PublishedAt,
-                )
-            }
-        }
-    }
+	qaChunks := rag.RetrieveQAWithContext(resolvedMessage, rctx, 3)
+	for _, ch := range qaChunks {
+		q, a := rag.ChunkQAPair(ch)
+		qaKnowledgeLines = append(qaKnowledgeLines, rag.FormatQAKnowledgeLine(ch, q, a))
+	}
+	trace.QAResults = len(qaChunks)
+	trace.QAUsed = len(qaChunks) > 0
 
-    enriched += fmt.Sprintf(
-        "\n\n[System Context]\nIntent: %s | Ticker: %s | Sentiment: %s | Confidence: %.2f",
-        intentResult.Intent,
-        strings.ToUpper(intentResult.Ticker),
-        sentiment,
-        intentResult.Confidence,
-    )
+	var liveMarket strings.Builder
+	var newsBody strings.Builder
 
-    return openai.CallOpenAI(sessionID, enriched)
+	if shouldEnrichMarket(intentResult.Intent, intentResult.Ticker) {
+		ticker := intentResult.Ticker
+
+		quote, err := resolveQuoteFn()(ticker)
+		if err == nil {
+			fmt.Fprintf(&liveMarket, "Quote (%s): price $%s | high $%s | low $%s | change %s (%s) | volume %s\n",
+				quote.Symbol, quote.Price, quote.High, quote.Low,
+				quote.Change, quote.ChangePercent, quote.Volume)
+		}
+
+		overview, err := resolveOverviewFn()(ticker)
+		if err == nil {
+			fmt.Fprintf(&liveMarket, "Fundamentals: %s | sector %s | industry %s | market cap $%s | P/E %s | EPS %s | beta %s | 52w high $%s | 52w low $%s | div yield %s | profit margin %s\nDescription (excerpt): %s",
+				overview.Name, overview.Sector, overview.Industry,
+				overview.MarketCap, overview.PERatio, overview.EPS, overview.Beta,
+				overview.Week52High, overview.Week52Low,
+				overview.DivYield, overview.ProfitMargin,
+				truncateRunes(overview.Description, 400),
+			)
+		}
+
+		news, err := resolveNewsFn()(ticker)
+		if err == nil && len(news) > 0 {
+			for i, article := range news {
+				if i >= 3 {
+					break
+				}
+				fmt.Fprintf(&newsBody, "%d. %s — source %s (%s)\n",
+					i+1, article.Title, article.Source.Name, article.PublishedAt)
+			}
+		}
+	}
+
+	webBody, webTrace := buildWebContextBody(resolvedMessage, string(intentResult.Intent), ent)
+	trace.WebUsed = webTrace.CleanedCount > 0
+	trace.WebResults = webTrace.CleanedCount
+	trace.WebFallback = webTrace.Fallback
+	trace.WebDecisionReason = webTrace.DecisionWhy
+	trace.WebFallbackReason = webTrace.FallbackWhy
+
+	return chatprompt.EnvelopeInput{
+		UserMessage:      message,
+		KnowledgeLines:   knowledgeLines,
+		QAKnowledgeLines: qaKnowledgeLines,
+		LiveMarketBody:   strings.TrimSpace(liveMarket.String()),
+		NewsBody:         strings.TrimSpace(newsBody.String()),
+		WebContextBody:   webBody,
+		PortfolioBody:    "",
+		Intent:           string(intentResult.Intent),
+		Ticker:           intentResult.Ticker,
+		Sentiment:        string(sentiment),
+		IntentConfidence: intentResult.Confidence,
+	}, trace
+}
+
+// buildWebContextBody runs the live web search step. It is fully optional and
+// degrades silently: if the decision says no, the provider is unconfigured,
+// the call errors, or the cleaner drops every hit, this returns "" and the
+// envelope renders the standard "no live web search results" note.
+func buildWebContextBody(message, intent string, ent entity.EntityResult) (string, webSearchTrace) {
+	decision := websearch.Decide(message, intent, ent)
+	trace := webSearchTrace{
+		DecisionUse: decision.Use,
+		DecisionWhy: decision.Reason,
+	}
+	if !decision.Use {
+		return "", trace
+	}
+	provider := websearch.DefaultProvider()
+	if provider == nil {
+		trace.Fallback = true
+		trace.FallbackWhy = "provider_nil"
+		return "", trace
+	}
+	trace.ProviderName = provider.Name()
+	ctx, cancel := context.WithTimeout(context.Background(), webSearchTimeout)
+	defer cancel()
+	raw, err := provider.Search(ctx, decision.Query, 5)
+	if err != nil {
+		// Intentional silent fallback: chat must never break on a flaky
+		// upstream search provider. Operators can correlate via the provider
+		// logs; the prompt will state "no live web search results".
+		trace.Fallback = true
+		trace.FallbackWhy = "provider_error"
+		return "", trace
+	}
+	trace.RawCount = len(raw)
+	cleaned := websearch.CleanAndRank(raw, webSearchTopK)
+	trace.CleanedCount = len(cleaned)
+	if len(cleaned) == 0 {
+		trace.Fallback = true
+		trace.FallbackWhy = "no_usable_results"
+		return "", trace
+	}
+	return websearch.FormatForPrompt(cleaned), trace
+}
+
+func shouldEnrichMarket(intent ml.Intent, ticker string) bool {
+	if ticker == "" {
+		return false
+	}
+	switch intent {
+	case ml.IntentStockPrice, ml.IntentRiskAnalysis, ml.IntentMarketNews:
+		return true
+	default:
+		return false
+	}
+}
+
+func truncateRunes(s string, max int) string {
+	s = strings.TrimSpace(s)
+	if max <= 0 || s == "" {
+		return s
+	}
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	return string(r[:max]) + "…"
+}
+
+func logChatPipelineEnrichment(sessionID, message string, t chatPipelineTrace) {
+	logChatEvent("chat_pipeline_enrichment",
+		"session_id", sessionID,
+		"message_preview", messagePreview(message),
+		"followup_resolved", t.FollowUpResolved,
+		"followup_ticker", t.FollowUpTicker,
+		"followup_reason", t.FollowUpReason,
+		"intent", t.Intent,
+		"intent_confidence", fmt.Sprintf("%.2f", t.IntentConfidence),
+		"intent_source", t.IntentSource,
+		"intent_fallback", t.IntentFallback,
+		"entity_primary_ticker", t.EntityPrimary,
+		"entity_secondary_count", t.EntitySecondaryN,
+		"entity_company_count", t.EntityCompaniesN,
+		"rag_used", t.RAGUsed,
+		"rag_results", t.RAGResults,
+		"qa_used", t.QAUsed,
+		"qa_results", t.QAResults,
+		"web_used", t.WebUsed,
+		"web_results", t.WebResults,
+		"web_decision_reason", t.WebDecisionReason,
+		"web_fallback", t.WebFallback,
+		"web_fallback_reason", t.WebFallbackReason,
+	)
 }

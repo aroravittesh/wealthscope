@@ -1,0 +1,359 @@
+/* Embedded assistant widget — CSS Leo character + callout; panel anchored above page footer strip */
+
+:host {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.leo-assistant-root {
+  position: relative;
+}
+
+.leo-assistant-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1385;
+  background: rgba(15, 23, 42, 0.38);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: leo-backdrop-in 0.2s ease-out;
+}
+
+@keyframes leo-backdrop-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.leo-assistant-panel-layer {
+  position: fixed;
+  z-index: 1410;
+  right: clamp(1rem, 4vw, 2rem);
+  bottom: calc(6.75rem + env(safe-area-inset-bottom, 0px));
+  width: min(400px, calc(100vw - 2rem));
+  max-height: min(560px, calc(100vh - 8.5rem - env(safe-area-inset-bottom, 0px)));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  animation: leo-panel-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes leo-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.99);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Assistant “card” in page flow — not a FAB */
+.leo-assistant-widget {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  margin: 0;
+  padding: 0.65rem 0.85rem 0.65rem 1rem;
+  max-width: min(100%, 28rem);
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.92) 0%, rgba(15, 23, 42, 0.96) 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 12px 32px rgba(2, 6, 23, 0.45);
+  transition:
+    transform 0.28s cubic-bezier(0.34, 1.2, 0.64, 1),
+    box-shadow 0.28s ease,
+    border-color 0.28s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: rgba(96, 165, 250, 0.35);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.08) inset,
+      0 16px 40px rgba(2, 6, 23, 0.5),
+      0 0 0 1px rgba(59, 130, 246, 0.12);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  &:focus-visible {
+    outline: 2px solid #60a5fa;
+    outline-offset: 3px;
+  }
+}
+
+.leo-assistant-widget__bubble {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  padding: 0.55rem 0.75rem 0.6rem;
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.97);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+}
+
+.leo-assistant-widget__bubble-tail {
+  position: absolute;
+  right: -7px;
+  bottom: 14px;
+  width: 0;
+  height: 0;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-left: 8px solid rgba(248, 250, 252, 0.97);
+  filter: drop-shadow(1px 0 0 rgba(226, 232, 240, 0.9));
+}
+
+.leo-assistant-widget__bubble-text {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+/* Small humanoid bot — head, torso, arms, legs */
+.leo-bot {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 3.25rem;
+  animation: leo-bot-idle 4s ease-in-out infinite;
+}
+
+.leo-bot__head {
+  width: 2.35rem;
+  height: 2rem;
+  border-radius: 0.65rem 0.65rem 0.4rem 0.4rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.leo-bot__visor {
+  width: 1.65rem;
+  height: 0.78rem;
+  border-radius: 0.35rem;
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.leo-bot__eye {
+  width: 0.28rem;
+  height: 0.2rem;
+  border-radius: 0.1rem;
+  background: #38bdf8;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.75);
+}
+
+.leo-bot__upper {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0;
+  margin-top: -1px;
+}
+
+/* Arms + distinct hands */
+.leo-bot__arm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform-origin: 50% 0;
+  margin-bottom: 0.12rem;
+}
+
+.leo-bot__arm--left {
+  margin-right: -2px;
+}
+
+.leo-bot__arm--right {
+  margin-left: -2px;
+  animation: leo-bot-wave 2.8s ease-in-out infinite;
+}
+
+.leo-bot__forearm {
+  width: 0.36rem;
+  height: 0.72rem;
+  border-radius: 0.18rem;
+  background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+  border: 1px solid rgba(29, 78, 216, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.leo-bot__hand {
+  width: 0.52rem;
+  height: 0.34rem;
+  margin-top: -2px;
+  border-radius: 0.22rem;
+  background: linear-gradient(165deg, #f1f5f9 0%, #dbeafe 45%, #bfdbfe 100%);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.leo-bot__torso {
+  width: 2.35rem;
+  height: 1.85rem;
+  border-radius: 0.35rem 0.35rem 0.45rem 0.45rem;
+  background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-top: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
+}
+
+.leo-bot__badge {
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #eff6ff;
+  padding: 0.12rem 0.35rem;
+  border-radius: 0.25rem;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.4);
+}
+
+.leo-bot__legs {
+  display: flex;
+  flex-direction: row;
+  gap: 0.38rem;
+  margin-top: -1px;
+}
+
+/* Legs + distinct feet */
+.leo-bot__leg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.leo-bot__leg-segment {
+  width: 0.52rem;
+  height: 0.62rem;
+  border-radius: 0.14rem 0.14rem 0.22rem 0.22rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 1px solid rgba(148, 163, 184, 0.38);
+  border-bottom: none;
+  box-shadow: inset 0 -1px 0 rgba(148, 163, 184, 0.15);
+}
+
+.leo-bot__foot {
+  width: 0.72rem;
+  height: 0.26rem;
+  margin-top: -1px;
+  border-radius: 0.42rem 0.42rem 0.18rem 0.18rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 100%);
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  border-top-color: rgba(203, 213, 225, 0.75);
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.12);
+}
+
+@keyframes leo-bot-idle {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes leo-bot-wave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  15% {
+    transform: rotate(14deg);
+  }
+
+  30% {
+    transform: rotate(-6deg);
+  }
+
+  45% {
+    transform: rotate(12deg);
+  }
+
+  60% {
+    transform: rotate(0deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .leo-assistant-backdrop,
+  .leo-assistant-panel-layer {
+    animation: none;
+  }
+
+  .leo-bot {
+    animation: none;
+  }
+
+  .leo-bot__arm--right {
+    animation: none;
+  }
+
+  .leo-assistant-widget {
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  .leo-assistant-widget:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .leo-assistant-widget {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.75rem 0.85rem;
+    max-width: 100%;
+  }
+
+  .leo-assistant-widget__bubble-tail {
+    display: none;
+  }
+
+  .leo-bot {
+    align-self: center;
+    margin-bottom: 0.25rem;
+  }
+
+  .leo-assistant-panel-layer {
+    right: 0.75rem;
+    bottom: calc(7.25rem + env(safe-area-inset-bottom, 0px));
+    width: calc(100vw - 1.5rem);
+    max-height: min(520px, calc(100vh - 9rem));
+  }
+}

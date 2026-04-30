@@ -179,6 +179,7 @@ import { User } from '../models';
       animation: spin-slow 12s linear infinite;
     }
 
+
     .logo-blend {
       mix-blend-mode: screen;
       opacity: 0.95;

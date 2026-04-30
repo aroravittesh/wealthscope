@@ -61,8 +61,10 @@ export class AuthService {
   // PROFILE
   // ========================
 
-  getProfile(): Observable<{ email: string; risk_preference: string }> {
-    return this.http.get<{ email: string; risk_preference: string }>(`${this.apiUrl}/auth/profile`);
+  getProfile(): Observable<{ email: string; risk_preference: string; role?: 'USER' | 'ADMIN' }> {
+    return this.http.get<{ email: string; risk_preference: string; role?: 'USER' | 'ADMIN' }>(
+      `${this.apiUrl}/auth/profile`
+    );
   }
 
   updateRiskPreference(riskPreference: string): Observable<{ email: string; risk_preference: string }> {
@@ -180,13 +182,31 @@ export class AuthService {
     }
   }
 
-  private setUserFromProfile(profile: { email: string; risk_preference: string }): void {
+  private setUserFromProfile(profile: { email: string; risk_preference: string; role?: 'USER' | 'ADMIN' }): void {
+    const roleFromToken = this.getRoleFromToken();
     const user: User = {
       email: profile.email,
-      riskPreference: profile.risk_preference
+      riskPreference: profile.risk_preference,
+      role: profile.role ?? roleFromToken
     };
     localStorage.setItem('user', JSON.stringify(user));
     this.currentUserSubject.next(user);
+  }
+
+  private getRoleFromToken(): 'USER' | 'ADMIN' | undefined {
+    const token = localStorage.getItem('authToken');
+    if (!token) return undefined;
+
+    try {
+      const decoded = JSON.parse(atob(token.split('.')[1]));
+      const role = decoded?.role;
+      if (role === 'ADMIN' || role === 'USER') {
+        return role;
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   private bootstrapSession(): void {

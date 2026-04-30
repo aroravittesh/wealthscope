@@ -1,21 +1,22 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { forkJoin, of, Subject } from 'rxjs';
-import { catchError, map, takeUntil } from 'rxjs/operators';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { PortfolioService } from '../services/portfolio.service';
-import { Holding, Portfolio, PortfolioSummary } from '../models';
+import { Portfolio, PortfolioSnapshot, PortfolioSnapshotCompareResponse, PortfolioSnapshotTrendPoint, PortfolioSummary } from '../models';
 
 @Component({
   selector: 'app-reporting-analytics',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, FormsModule],
   template: `
     <div class="max-w-7xl min-h-[calc(100vh-4rem)] mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <div>
           <h1 class="text-3xl font-bold text-white">Analytics</h1>
-          <p class="text-slate-400 mt-1">Totals and allocation from the analytics API (mark-to-estimate pricing).</p>
+          <p class="text-slate-400 mt-1">Analyze one portfolio at a time and manage report snapshots.</p>
         </div>
         <div class="flex gap-2">
           <button
@@ -40,6 +41,186 @@ import { Holding, Portfolio, PortfolioSummary } from '../models';
         </div>
       </div>
 
+      <div class="bg-slate-800/70 rounded-xl p-4 border border-slate-700 mb-6 grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Portfolio</label>
+          <select
+            [(ngModel)]="selectedPortfolioId"
+            (change)="onPortfolioChange()"
+            class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-slate-200"
+          >
+            <option value="" disabled>Select portfolio</option>
+            <option *ngFor="let p of portfolios" [value]="p.id">{{ p.name }}</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Snapshot History</label>
+          <select
+            [(ngModel)]="selectedSnapshotId"
+            (change)="onSnapshotChange()"
+            class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-slate-200"
+            [disabled]="loading || snapshots.length === 0"
+          >
+            <option value="">Live data (no snapshot)</option>
+            <option *ngFor="let s of snapshots" [value]="s.id">
+              {{ s.createdAt | date:'medium' }}
+            </option>
+          </select>
+        </div>
+
+        <div class="flex items-end gap-2">
+          <button
+            type="button"
+            (click)="saveSnapshot()"
+            class="bg-yellow-600 hover:bg-yellow-500 text-white font-semibold px-4 py-2 rounded-lg transition"
+            [disabled]="loading || !selectedPortfolioId || savingSnapshot"
+          >
+            {{ savingSnapshot ? 'Saving...' : 'Save Snapshot' }}
+          </button>
+          <button
+            type="button"
+            (click)="refreshLive()"
+            class="bg-slate-700 hover:bg-slate-600 text-white font-semibold px-4 py-2 rounded-lg transition"
+            [disabled]="loading || !selectedPortfolioId"
+          >
+            Refresh Live
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/70 rounded-xl p-4 border border-slate-700 mb-6 grid grid-cols-1 lg:grid-cols-4 gap-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Then (from snapshot)</label>
+          <select
+            [(ngModel)]="compareFromSnapshotId"
+            class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-slate-200"
+            [disabled]="compareLoading || snapshots.length < 2"
+          >
+            <option value="" disabled>Select older snapshot</option>
+            <option *ngFor="let s of snapshots" [value]="s.id">{{ s.createdAt | date:'medium' }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Now (to snapshot)</label>
+          <select
+            [(ngModel)]="compareToSnapshotId"
+            class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-slate-200"
+            [disabled]="compareLoading || snapshots.length < 2"
+          >
+            <option value="" disabled>Select newer snapshot</option>
+            <option *ngFor="let s of snapshots" [value]="s.id">{{ s.createdAt | date:'medium' }}</option>
+          </select>
+        </div>
+        <div class="flex items-end">
+          <button
+            type="button"
+            (click)="runSnapshotCompare()"
+            class="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold px-4 py-2 rounded-lg transition w-full"
+            [disabled]="compareLoading || !canRunCompare"
+          >
+            {{ compareLoading ? 'Comparing...' : 'Compare Snapshots' }}
+          </button>
+        </div>
+        <div class="flex items-end text-xs text-slate-400">
+          <span *ngIf="snapshots.length < 2">Save at least 2 snapshots to compare progression.</span>
+          <span *ngIf="snapshots.length >= 2 && snapshotCompare">Then: {{ snapshotCompare.fromAt | date:'short' }} → Now: {{ snapshotCompare.toAt | date:'short' }}</span>
+        </div>
+      </div>
+
+      <div *ngIf="snapshotCompare" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+        <div class="bg-slate-800/70 rounded-xl p-5 border border-slate-700">
+          <p class="text-slate-400 text-xs uppercase tracking-wide">Value Change</p>
+          <p class="mt-2 text-xl font-bold" [ngClass]="deltaClass(snapshotCompare.totalValueDelta.absolute)">
+            {{ signedCurrency(snapshotCompare.totalValueDelta.absolute) }}
+          </p>
+          <p class="text-xs mt-1" [ngClass]="deltaClass(snapshotCompare.totalValueDelta.percent)">
+            {{ signedPercent(snapshotCompare.totalValueDelta.percent) }}
+          </p>
+        </div>
+        <div class="bg-slate-800/70 rounded-xl p-5 border border-slate-700">
+          <p class="text-slate-400 text-xs uppercase tracking-wide">P/L Change</p>
+          <p class="mt-2 text-xl font-bold" [ngClass]="deltaClass(snapshotCompare.profitLossDelta.absolute)">
+            {{ signedCurrency(snapshotCompare.profitLossDelta.absolute) }}
+          </p>
+          <p class="text-xs mt-1" [ngClass]="deltaClass(snapshotCompare.profitLossDelta.percent)">
+            {{ signedPercent(snapshotCompare.profitLossDelta.percent) }}
+          </p>
+        </div>
+        <div class="bg-slate-800/70 rounded-xl p-5 border border-slate-700">
+          <p class="text-slate-400 text-xs uppercase tracking-wide">Diversification</p>
+          <p class="mt-2 text-xl font-bold" [ngClass]="deltaClass(snapshotCompare.diversificationDelta.absolute)">
+            {{ signedNumber(snapshotCompare.diversificationDelta.absolute) }}
+          </p>
+          <p class="text-xs mt-1" [ngClass]="deltaClass(snapshotCompare.diversificationDelta.percent)">
+            {{ signedPercent(snapshotCompare.diversificationDelta.percent) }}
+          </p>
+        </div>
+        <div class="bg-slate-800/70 rounded-xl p-5 border border-slate-700">
+          <p class="text-slate-400 text-xs uppercase tracking-wide">Volatility</p>
+          <p class="mt-2 text-xl font-bold" [ngClass]="deltaClass(snapshotCompare.volatilityDelta.absolute)">
+            {{ signedNumber(snapshotCompare.volatilityDelta.absolute) }}
+          </p>
+          <p class="text-xs mt-1" [ngClass]="deltaClass(snapshotCompare.volatilityDelta.percent)">
+            {{ signedPercent(snapshotCompare.volatilityDelta.percent) }}
+          </p>
+        </div>
+      </div>
+
+      <div *ngIf="snapshotCompare && topAllocationDriftRows.length > 0" class="bg-slate-800/70 rounded-xl p-6 border border-slate-700 mb-8">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold text-white">Allocation Drift Insights</h2>
+          <p class="text-xs text-slate-400">Top movers by weight change</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead class="bg-slate-800 text-slate-300">
+              <tr>
+                <th class="text-left p-3">Symbol</th>
+                <th class="text-left p-3">Then %</th>
+                <th class="text-left p-3">Now %</th>
+                <th class="text-left p-3">Drift %</th>
+                <th class="text-left p-3">Value Change</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of topAllocationDriftRows" class="border-t border-slate-700">
+                <td class="p-3 text-slate-100 font-medium">{{ row.symbol }}</td>
+                <td class="p-3 text-slate-300">{{ row.fromPercent.toFixed(2) }}%</td>
+                <td class="p-3 text-slate-300">{{ row.toPercent.toFixed(2) }}%</td>
+                <td class="p-3 font-semibold" [ngClass]="deltaClass(row.deltaPercent)">
+                  {{ signedPercent(row.deltaPercent) }}
+                </td>
+                <td class="p-3 font-semibold" [ngClass]="deltaClass(row.deltaValue)">
+                  {{ signedCurrency(row.deltaValue) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div *ngIf="snapshotTrendPoints.length > 0" class="bg-slate-800/70 rounded-xl p-6 border border-slate-700 mb-8">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xl font-semibold text-white">Snapshot Trend (Total Value)</h2>
+          <p class="text-xs text-slate-400">{{ snapshotTrendPoints.length }} points</p>
+        </div>
+        <svg viewBox="0 0 100 40" preserveAspectRatio="none" class="w-full h-32">
+          <polyline
+            [attr.points]="trendPolylinePoints"
+            fill="none"
+            stroke="#22d3ee"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          ></polyline>
+        </svg>
+        <div class="flex justify-between text-xs text-slate-400 mt-2">
+          <span>{{ snapshotTrendStartLabel }}</span>
+          <span>{{ snapshotTrendEndLabel }}</span>
+        </div>
+      </div>
+
       <div *ngIf="loading" class="space-y-4">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div *ngFor="let i of [1,2,3]" class="bg-slate-800/70 rounded-xl p-6 border border-slate-700 animate-pulse">
@@ -61,6 +242,10 @@ import { Holding, Portfolio, PortfolioSummary } from '../models';
 
       <div *ngIf="!loading && !errorMessage && warningMessage" class="bg-amber-900/20 border border-amber-500/40 rounded-xl p-4 text-amber-100 mb-6">
         {{ warningMessage }}
+      </div>
+
+      <div *ngIf="!loading && !errorMessage" class="bg-slate-800/50 border border-slate-700 rounded-xl p-3 text-slate-300 text-sm mb-6">
+        {{ reportContextLabel }}
       </div>
 
       <ng-container *ngIf="!loading && !errorMessage">
@@ -152,9 +337,21 @@ import { Holding, Portfolio, PortfolioSummary } from '../models';
   styles: []
 })
 export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
+  portfolios: Portfolio[] = [];
+  selectedPortfolioId = '';
+  selectedSnapshotId = '';
+  compareFromSnapshotId = '';
+  compareToSnapshotId = '';
+  snapshots: PortfolioSnapshot[] = [];
+  snapshotCompare: PortfolioSnapshotCompareResponse | null = null;
+  snapshotTrendPoints: PortfolioSnapshotTrendPoint[] = [];
+  compareLoading = false;
+  savingSnapshot = false;
+
   loading = false;
   errorMessage: string | null = null;
   warningMessage: string | null = null;
+  reportContextLabel = 'No portfolio selected.';
 
   totalValue = 0;
   totalInvested = 0;
@@ -180,61 +377,27 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
   constructor(private portfolioService: PortfolioService) {}
 
   ngOnInit(): void {
-    this.loadAnalytics();
+    this.loadPortfoliosAndInitialAnalytics();
   }
 
-  private loadAnalytics(): void {
+  private loadPortfoliosAndInitialAnalytics(): void {
     this.loading = true;
     this.errorMessage = null;
     this.warningMessage = null;
+    this.reportContextLabel = 'Loading portfolios...';
 
     this.portfolioService.getPortfolios().pipe(takeUntil(this.destroy$)).subscribe({
       next: portfolios => {
+        this.portfolios = portfolios;
         if (!portfolios.length) {
           this.resetAnalytics();
           this.loading = false;
+          this.reportContextLabel = 'No portfolios available.';
           return;
         }
-
-        const requests = portfolios.map(portfolio =>
-          forkJoin({
-            summary: this.portfolioService.getPortfolioSummary(portfolio.id).pipe(
-              catchError(() => of(null))
-            ),
-            holdings: this.portfolioService.getHoldings(portfolio.id).pipe(
-              catchError(() => of([] as Holding[]))
-            )
-          }).pipe(
-            map(({ summary, holdings }) => ({
-              portfolio,
-              summary,
-              holdings
-            }))
-          )
-        );
-
-        forkJoin(requests).pipe(takeUntil(this.destroy$)).subscribe({
-          next: rows => {
-            this.loading = false;
-            const ok = rows.filter(
-              (r): r is { portfolio: Portfolio; summary: PortfolioSummary; holdings: Holding[] } =>
-                r.summary !== null
-            );
-            if (!ok.length) {
-              this.errorMessage = 'Could not load portfolio analytics from the server.';
-              this.resetAnalytics();
-              return;
-            }
-            if (ok.length < rows.length) {
-              this.warningMessage = 'Some portfolios could not be loaded.';
-            }
-            this.buildAnalyticsFromSummaries(ok);
-          },
-          error: () => {
-            this.errorMessage = 'Failed to load analytics';
-            this.loading = false;
-          }
-        });
+        this.selectedPortfolioId = portfolios[0].id;
+        this.loadSnapshots();
+        this.loadLiveAnalyticsForSelectedPortfolio();
       },
       error: err => {
         this.errorMessage = err?.error?.message ?? err?.error ?? 'Failed to load analytics';
@@ -243,53 +406,205 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
     });
   }
 
-  private buildAnalyticsFromSummaries(
-    rows: Array<{ portfolio: Portfolio; summary: PortfolioSummary; holdings: Holding[] }>
-  ): void {
-    const symbolTotals = new Map<string, { value: number; cost: number }>();
-    const portfolioStats: Array<{
-      name: string;
-      value: number;
-      holdingsCount: number;
-      diversificationScore: number;
-      volatilityScore: number;
-    }> = [];
+  onPortfolioChange(): void {
+    this.selectedSnapshotId = '';
+    this.compareFromSnapshotId = '';
+    this.compareToSnapshotId = '';
+    this.snapshotCompare = null;
+    this.loadSnapshots();
+    this.loadLiveAnalyticsForSelectedPortfolio();
+  }
 
-    let totalInvested = 0;
-    let totalMarket = 0;
-    let weightedDiv = 0;
-    let weightedVol = 0;
+  onSnapshotChange(): void {
+    if (!this.selectedSnapshotId) {
+      this.loadLiveAnalyticsForSelectedPortfolio();
+      return;
+    }
+    this.loadSnapshotById(this.selectedSnapshotId);
+  }
 
-    for (const { portfolio, summary, holdings } of rows) {
-      totalInvested += summary.totalInvested;
-      const mkt = summary.totalPortfolioValue;
-      totalMarket += mkt;
-      weightedDiv += summary.diversificationScore * mkt;
-      weightedVol += summary.volatilityScore * mkt;
-      portfolioStats.push({
-        name: portfolio.name,
-        value: mkt,
-        holdingsCount: holdings.length,
-        diversificationScore: summary.diversificationScore,
-        volatilityScore: summary.volatilityScore
-      });
+  saveSnapshot(): void {
+    if (!this.selectedPortfolioId) return;
+    this.savingSnapshot = true;
+    this.errorMessage = null;
+    this.warningMessage = null;
 
-      for (const row of summary.assetAllocation) {
-        const cur = symbolTotals.get(row.symbol) ?? { value: 0, cost: 0 };
-        cur.value += row.value;
-        cur.cost += row.costBasis;
-        symbolTotals.set(row.symbol, cur);
+    this.portfolioService.createPortfolioSnapshot(this.selectedPortfolioId).pipe(takeUntil(this.destroy$)).subscribe({
+      next: snapshot => {
+        this.savingSnapshot = false;
+        this.selectedSnapshotId = snapshot.id;
+        this.loadSnapshots();
+        this.applySummary(snapshot.summary, this.getSelectedPortfolioName(), 0);
+        this.reportContextLabel = `Snapshot view: ${this.getSelectedPortfolioName()} · ${snapshot.createdAt.toLocaleString()}`;
+      },
+      error: err => {
+        this.savingSnapshot = false;
+        this.errorMessage = err?.error?.message ?? err?.error ?? 'Failed to save snapshot.';
       }
+    });
+  }
+
+  refreshLive(): void {
+    this.selectedSnapshotId = '';
+    this.loadLiveAnalyticsForSelectedPortfolio();
+  }
+
+  private loadSnapshots(): void {
+    if (!this.selectedPortfolioId) {
+      this.snapshots = [];
+      return;
+    }
+    this.portfolioService.getPortfolioSnapshots(this.selectedPortfolioId).pipe(takeUntil(this.destroy$)).subscribe({
+      next: snapshots => {
+        this.snapshots = [...snapshots].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        this.setDefaultCompareSnapshotIds();
+        this.loadSnapshotTrend();
+      },
+      error: () => {
+        this.snapshots = [];
+        this.compareFromSnapshotId = '';
+        this.compareToSnapshotId = '';
+        this.snapshotTrendPoints = [];
+      }
+    });
+  }
+
+  private loadSnapshotTrend(): void {
+    if (!this.selectedPortfolioId) {
+      this.snapshotTrendPoints = [];
+      return;
+    }
+    this.portfolioService
+      .getPortfolioSnapshotTrend(this.selectedPortfolioId, 30)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: trend => {
+          this.snapshotTrendPoints = trend.points ?? [];
+        },
+        error: () => {
+          this.snapshotTrendPoints = [];
+        }
+      });
+  }
+
+  get canRunCompare(): boolean {
+    return !!this.selectedPortfolioId &&
+      !!this.compareFromSnapshotId &&
+      !!this.compareToSnapshotId &&
+      this.compareFromSnapshotId !== this.compareToSnapshotId;
+  }
+
+  runSnapshotCompare(): void {
+    if (!this.canRunCompare || !this.selectedPortfolioId) {
+      this.errorMessage = 'Please select two different snapshots to compare.';
+      return;
+    }
+    this.compareLoading = true;
+    this.errorMessage = null;
+
+    this.portfolioService
+      .getPortfolioSnapshotCompare(this.selectedPortfolioId, this.compareFromSnapshotId, this.compareToSnapshotId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: compare => {
+          this.compareLoading = false;
+          this.snapshotCompare = compare;
+          this.warningMessage = null;
+        },
+        error: err => {
+          this.compareLoading = false;
+          this.snapshotCompare = null;
+          this.errorMessage = err?.error?.message ?? err?.error ?? 'Failed to compare snapshots.';
+        }
+      });
+  }
+
+  private loadSnapshotById(snapshotId: string): void {
+    if (!this.selectedPortfolioId || !snapshotId) return;
+    this.errorMessage = null;
+    this.warningMessage = null;
+
+    const local = this.snapshots.find(s => s.id === snapshotId);
+    if (local) {
+      this.applySummary(local.summary, this.getSelectedPortfolioName(), 0);
+      this.reportContextLabel = `Snapshot view: ${this.getSelectedPortfolioName()} · ${local.createdAt.toLocaleString()}`;
+      return;
     }
 
-    this.totalValue = totalMarket;
-    this.totalInvested = totalInvested;
+    // Fallback: refresh snapshot list and resolve the selected entry from it.
+    this.loading = true;
+    this.portfolioService
+      .getPortfolioSnapshots(this.selectedPortfolioId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: snapshots => {
+          this.loading = false;
+          this.snapshots = [...snapshots].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+          const resolved = this.snapshots.find(s => s.id === snapshotId);
+          if (!resolved) {
+            this.errorMessage = 'Snapshot not found.';
+            return;
+          }
+          this.applySummary(resolved.summary, this.getSelectedPortfolioName(), 0);
+          this.reportContextLabel = `Snapshot view: ${this.getSelectedPortfolioName()} · ${resolved.createdAt.toLocaleString()}`;
+        },
+        error: err => {
+          this.loading = false;
+          this.errorMessage = err?.error?.message ?? err?.error ?? 'Failed to load snapshot.';
+        }
+      });
+  }
+
+  private loadLiveAnalyticsForSelectedPortfolio(): void {
+    if (!this.selectedPortfolioId) {
+      this.resetAnalytics();
+      this.reportContextLabel = 'No portfolio selected.';
+      return;
+    }
+    this.loading = true;
+    this.errorMessage = null;
+    this.warningMessage = null;
+
+    this.portfolioService.getPortfolioSummary(this.selectedPortfolioId).pipe(takeUntil(this.destroy$)).subscribe({
+      next: summary => {
+        this.portfolioService.getHoldings(this.selectedPortfolioId).pipe(takeUntil(this.destroy$)).subscribe({
+          next: holdings => {
+            this.loading = false;
+            this.applySummary(summary, this.getSelectedPortfolioName(), holdings.length);
+            this.reportContextLabel = `Live view: ${this.getSelectedPortfolioName()}`;
+          },
+          error: () => {
+            this.loading = false;
+            this.applySummary(summary, this.getSelectedPortfolioName(), 0);
+            this.warningMessage = 'Holdings count unavailable. Core analytics loaded.';
+            this.reportContextLabel = `Live view: ${this.getSelectedPortfolioName()}`;
+          }
+        });
+      },
+      error: err => {
+        this.loading = false;
+        this.errorMessage = err?.error?.message ?? err?.error ?? 'Failed to load portfolio analytics.';
+      }
+    });
+  }
+
+  private applySummary(summary: PortfolioSummary, portfolioName: string, holdingsCount: number): void {
+    const symbolTotals = new Map<string, { value: number; cost: number }>();
+    for (const row of summary.assetAllocation) {
+      const cur = symbolTotals.get(row.symbol) ?? { value: 0, cost: 0 };
+      cur.value += row.value;
+      cur.cost += row.costBasis;
+      symbolTotals.set(row.symbol, cur);
+    }
+
+    this.totalValue = summary.totalPortfolioValue;
+    this.totalInvested = summary.totalInvested;
     this.profitLoss = this.totalValue - this.totalInvested;
     this.profitLossPercent =
       this.totalInvested > 0 ? (this.profitLoss / this.totalInvested) * 100 : 0;
 
-    this.diversificationScoreAgg = totalMarket > 0 ? weightedDiv / totalMarket : 0;
-    this.volatilityScoreAgg = totalMarket > 0 ? weightedVol / totalMarket : 0;
+    this.diversificationScoreAgg = summary.diversificationScore;
+    this.volatilityScoreAgg = summary.volatilityScore;
 
     this.allocationRows = Array.from(symbolTotals.entries())
       .map(([symbol, { value, cost }]) => ({
@@ -300,12 +615,14 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
       }))
       .sort((a, b) => b.percent - a.percent);
 
-    this.portfolioRows = portfolioStats
-      .map(p => ({
-        ...p,
-        share: this.totalValue > 0 ? (p.value / this.totalValue) * 100 : 0
-      }))
-      .sort((a, b) => b.value - a.value);
+    this.portfolioRows = [{
+      name: portfolioName,
+      value: summary.totalPortfolioValue,
+      share: 100,
+      holdingsCount,
+      diversificationScore: summary.diversificationScore,
+      volatilityScore: summary.volatilityScore
+    }];
   }
 
   private resetAnalytics(): void {
@@ -320,6 +637,83 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
     this.warningMessage = null;
   }
 
+  private getSelectedPortfolioName(): string {
+    const portfolio = this.portfolios.find(p => p.id === this.selectedPortfolioId);
+    return portfolio?.name ?? 'Selected Portfolio';
+  }
+
+  private setDefaultCompareSnapshotIds(): void {
+    if (this.snapshots.length < 2) {
+      this.compareFromSnapshotId = '';
+      this.compareToSnapshotId = '';
+      this.snapshotCompare = null;
+      return;
+    }
+
+    if (!this.compareFromSnapshotId) {
+      this.compareFromSnapshotId = this.snapshots[this.snapshots.length - 1].id;
+    }
+    if (!this.compareToSnapshotId) {
+      this.compareToSnapshotId = this.snapshots[0].id;
+    }
+  }
+
+  deltaClass(value: number): string {
+    if (value > 0) return 'text-green-400';
+    if (value < 0) return 'text-red-400';
+    return 'text-slate-200';
+  }
+
+  signedCurrency(value: number): string {
+    return `${value >= 0 ? '+' : '-'}$${Math.abs(value).toFixed(2)}`;
+  }
+
+  signedPercent(value: number): string {
+    return `${value >= 0 ? '+' : '-'}${Math.abs(value).toFixed(2)}%`;
+  }
+
+  signedNumber(value: number): string {
+    return `${value >= 0 ? '+' : '-'}${Math.abs(value).toFixed(2)}`;
+  }
+
+  get trendPolylinePoints(): string {
+    if (this.snapshotTrendPoints.length <= 1) {
+      return '';
+    }
+
+    const values = this.snapshotTrendPoints.map(p => p.totalPortfolioValue);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+
+    return this.snapshotTrendPoints
+      .map((point, idx) => {
+        const x = (idx / (this.snapshotTrendPoints.length - 1)) * 100;
+        const y = 40 - (((point.totalPortfolioValue - min) / range) * 36 + 2);
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+      })
+      .join(' ');
+  }
+
+  get snapshotTrendStartLabel(): string {
+    if (!this.snapshotTrendPoints.length) return '';
+    return this.snapshotTrendPoints[0].createdAt.toLocaleDateString();
+  }
+
+  get snapshotTrendEndLabel(): string {
+    if (!this.snapshotTrendPoints.length) return '';
+    return this.snapshotTrendPoints[this.snapshotTrendPoints.length - 1].createdAt.toLocaleDateString();
+  }
+
+  get topAllocationDriftRows() {
+    if (!this.snapshotCompare?.allocationDrift?.length) {
+      return [];
+    }
+    return [...this.snapshotCompare.allocationDrift]
+      .sort((a, b) => Math.abs(b.deltaPercent) - Math.abs(a.deltaPercent))
+      .slice(0, 6);
+  }
+
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
@@ -328,6 +722,7 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
   downloadCsv(): void {
     const rows: string[] = [];
     rows.push('Section,Metric,Value');
+    rows.push(`Context,Data Source,${this.reportContextLabel}`);
     rows.push(`Summary,Total Portfolio Value,${this.totalValue.toFixed(2)}`);
     rows.push(`Summary,Total Invested,${this.totalInvested.toFixed(2)}`);
     rows.push(`Summary,Profit/Loss,${this.profitLoss.toFixed(2)}`);
@@ -353,15 +748,16 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `wealthscope-analytics-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `aurex-analytics-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
   downloadPdf(): void {
     const lines: string[] = [];
-    lines.push('WealthScope Analytics Report');
+    lines.push('Aurex Analytics Report');
     lines.push(`Generated: ${new Date().toLocaleString()}`);
+    lines.push(`Context: ${this.reportContextLabel}`);
     lines.push('');
     lines.push(`Total Portfolio Value: $${this.totalValue.toFixed(2)}`);
     lines.push(`Total Invested: $${this.totalInvested.toFixed(2)}`);
@@ -399,7 +795,7 @@ export class ReportingAnalyticsComponent implements OnInit, OnDestroy {
     }
     win.document.write(`
       <html>
-        <head><title>WealthScope Analytics Report</title></head>
+        <head><title>Aurex Analytics Report</title></head>
         <body style="font-family: Arial, sans-serif; padding: 24px; white-space: pre-wrap;">
 ${lines.join('\n')}
         </body>

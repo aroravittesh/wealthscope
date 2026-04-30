@@ -6,10 +6,16 @@ import { map, tap } from 'rxjs/operators';
 
 import {
   AssetAllocationRow,
+  AllocationDriftRow,
   DashboardMetrics,
   Holding,
   Portfolio,
-  PortfolioSummary
+  PortfolioSnapshotCompareResponse,
+  PortfolioSnapshotTrendPoint,
+  PortfolioSnapshotTrendResponse,
+  PortfolioSnapshot,
+  PortfolioSummary,
+  SnapshotDelta
 } from '../models';
 
 @Injectable({
@@ -105,6 +111,41 @@ export class PortfolioService {
     );
   }
 
+  createPortfolioSnapshot(portfolioId: string): Observable<PortfolioSnapshot> {
+    return this.http.post<any>(`${this.portfolioApiUrl}/${portfolioId}/snapshots`, {}).pipe(
+      map(raw => this.mapPortfolioSnapshotFromApi(raw, portfolioId))
+    );
+  }
+
+  getPortfolioSnapshots(portfolioId: string): Observable<PortfolioSnapshot[]> {
+    return this.http.get<any[]>(`${this.portfolioApiUrl}/${portfolioId}/snapshots`).pipe(
+      map(rows => (rows || []).map(row => this.mapPortfolioSnapshotFromApi(row, portfolioId)))
+    );
+  }
+
+  getPortfolioSnapshotById(portfolioId: string, snapshotId: string): Observable<PortfolioSnapshot> {
+    return this.http.get<any>(`${this.portfolioApiUrl}/${portfolioId}/snapshots/${snapshotId}`).pipe(
+      map(raw => this.mapPortfolioSnapshotFromApi(raw, portfolioId))
+    );
+  }
+
+  getPortfolioSnapshotCompare(
+    portfolioId: string,
+    fromSnapshotId: string,
+    toSnapshotId: string
+  ): Observable<PortfolioSnapshotCompareResponse> {
+    const url = `${this.portfolioApiUrl}/${portfolioId}/snapshots/compare?from=${encodeURIComponent(fromSnapshotId)}&to=${encodeURIComponent(toSnapshotId)}`;
+    return this.http.get<any>(url).pipe(
+      map(raw => this.mapPortfolioSnapshotCompareFromApi(raw))
+    );
+  }
+
+  getPortfolioSnapshotTrend(portfolioId: string, limit = 20): Observable<PortfolioSnapshotTrendResponse> {
+    return this.http
+      .get<any>(`${this.portfolioApiUrl}/${portfolioId}/snapshots/trend?limit=${limit}`)
+      .pipe(map(raw => this.mapPortfolioSnapshotTrendFromApi(raw)));
+  }
+
   getHoldings(portfolioId: string): Observable<Holding[]> {
     return this.http
       .get<any[]>(`${this.holdingsApiUrl}/${portfolioId}`)
@@ -176,4 +217,78 @@ export class PortfolioService {
     value: Number(row.value ?? 0),
     percent: Number(row.percent ?? 0)
   });
+
+  private mapPortfolioSnapshotFromApi(raw: any, portfolioId: string): PortfolioSnapshot {
+    let summaryRaw: any = raw.summary ?? raw.portfolio_summary ?? raw.summary_json ?? raw;
+    if (typeof summaryRaw === 'string') {
+      try {
+        summaryRaw = JSON.parse(summaryRaw);
+      } catch {
+        summaryRaw = {};
+      }
+    }
+    return {
+      id: String(raw.id ?? raw.snapshot_id ?? raw.snapshotId ?? ''),
+      portfolioId: String(raw.portfolio_id ?? raw.portfolioId ?? portfolioId),
+      portfolioName: raw.portfolio_name ?? raw.portfolioName ?? summaryRaw?.portfolio_name ?? summaryRaw?.portfolioName,
+      createdAt: new Date(raw.created_at ?? raw.createdAt ?? new Date().toISOString()),
+      summary: this.mapPortfolioSummaryFromApi(summaryRaw)
+    };
+  }
+
+  private mapSnapshotDeltaFromApi(raw: any): SnapshotDelta {
+    return {
+      absolute: Number(raw?.absolute ?? 0),
+      percent: Number(raw?.percent ?? 0)
+    };
+  }
+
+  private mapAllocationDriftRowFromApi(raw: any): AllocationDriftRow {
+    return {
+      symbol: String(raw?.symbol ?? ''),
+      fromPercent: Number(raw?.from_percent ?? raw?.fromPercent ?? 0),
+      toPercent: Number(raw?.to_percent ?? raw?.toPercent ?? 0),
+      deltaPercent: Number(raw?.delta_percent ?? raw?.deltaPercent ?? 0),
+      fromValue: Number(raw?.from_value ?? raw?.fromValue ?? 0),
+      toValue: Number(raw?.to_value ?? raw?.toValue ?? 0),
+      deltaValue: Number(raw?.delta_value ?? raw?.deltaValue ?? 0)
+    };
+  }
+
+  private mapPortfolioSnapshotCompareFromApi(raw: any): PortfolioSnapshotCompareResponse {
+    return {
+      portfolioId: String(raw?.portfolio_id ?? raw?.portfolioId ?? ''),
+      fromId: String(raw?.from_id ?? raw?.fromId ?? ''),
+      toId: String(raw?.to_id ?? raw?.toId ?? ''),
+      fromAt: new Date(raw?.from_at ?? raw?.fromAt ?? new Date().toISOString()),
+      toAt: new Date(raw?.to_at ?? raw?.toAt ?? new Date().toISOString()),
+      totalValueDelta: this.mapSnapshotDeltaFromApi(raw?.total_value_delta ?? raw?.totalValueDelta),
+      totalInvestedDelta: this.mapSnapshotDeltaFromApi(raw?.total_invested_delta ?? raw?.totalInvestedDelta),
+      profitLossDelta: this.mapSnapshotDeltaFromApi(raw?.profit_loss_delta ?? raw?.profitLossDelta),
+      diversificationDelta: this.mapSnapshotDeltaFromApi(raw?.diversification_delta ?? raw?.diversificationDelta),
+      volatilityDelta: this.mapSnapshotDeltaFromApi(raw?.volatility_delta ?? raw?.volatilityDelta),
+      allocationDrift: (raw?.allocation_drift ?? raw?.allocationDrift ?? []).map((row: any) =>
+        this.mapAllocationDriftRowFromApi(row)
+      )
+    };
+  }
+
+  private mapPortfolioSnapshotTrendPointFromApi(raw: any): PortfolioSnapshotTrendPoint {
+    return {
+      snapshotId: String(raw?.snapshot_id ?? raw?.snapshotId ?? ''),
+      createdAt: new Date(raw?.created_at ?? raw?.createdAt ?? new Date().toISOString()),
+      totalPortfolioValue: Number(raw?.total_portfolio_value ?? raw?.totalPortfolioValue ?? 0),
+      totalInvested: Number(raw?.total_invested ?? raw?.totalInvested ?? 0),
+      totalProfitLoss: Number(raw?.total_profit_loss ?? raw?.totalProfitLoss ?? 0),
+      diversification: Number(raw?.diversification ?? 0),
+      volatility: Number(raw?.volatility ?? 0)
+    };
+  }
+
+  private mapPortfolioSnapshotTrendFromApi(raw: any): PortfolioSnapshotTrendResponse {
+    return {
+      portfolioId: String(raw?.portfolio_id ?? raw?.portfolioId ?? ''),
+      points: (raw?.points ?? []).map((p: any) => this.mapPortfolioSnapshotTrendPointFromApi(p))
+    };
+  }
 }

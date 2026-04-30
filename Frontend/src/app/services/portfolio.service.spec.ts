@@ -100,5 +100,84 @@ describe('PortfolioService', () => {
     expect(req.request.method).toBe('GET');
     req.flush(backendResponse);
   });
+
+  it('getPortfolioSnapshotCompare should map delta payload', () => {
+    const portfolioId = 'p-1';
+    const backendResponse = {
+      portfolio_id: portfolioId,
+      from_id: 's-old',
+      to_id: 's-new',
+      from_at: '2026-04-20T10:00:00.000Z',
+      to_at: '2026-04-29T10:00:00.000Z',
+      total_value_delta: { absolute: 250, percent: 10 },
+      total_invested_delta: { absolute: 100, percent: 5 },
+      profit_loss_delta: { absolute: 150, percent: 25 },
+      diversification_delta: { absolute: 2.5, percent: 3.2 },
+      volatility_delta: { absolute: -1.1, percent: -2.0 },
+      allocation_drift: [
+        {
+          symbol: 'AAPL',
+          from_percent: 20,
+          to_percent: 30,
+          delta_percent: 10,
+          from_value: 200,
+          to_value: 300,
+          delta_value: 100,
+        },
+      ],
+    };
+
+    service.getPortfolioSnapshotCompare(portfolioId, 's-old', 's-new').subscribe(compare => {
+      expect(compare.portfolioId).toBe(portfolioId);
+      expect(compare.fromId).toBe('s-old');
+      expect(compare.toId).toBe('s-new');
+      expect(compare.totalValueDelta.absolute).toBe(250);
+      expect(compare.profitLossDelta.percent).toBe(25);
+      expect(compare.volatilityDelta.absolute).toBe(-1.1);
+      expect(compare.allocationDrift.length).toBe(1);
+      expect(compare.allocationDrift[0].symbol).toBe('AAPL');
+      expect(compare.fromAt.toISOString()).toBe('2026-04-20T10:00:00.000Z');
+      expect(compare.toAt.toISOString()).toBe('2026-04-29T10:00:00.000Z');
+    });
+
+    const req = httpMock.expectOne(
+      `${environment.apiUrl}/portfolios/${portfolioId}/snapshots/compare?from=s-old&to=s-new`
+    );
+    expect(req.request.method).toBe('GET');
+    req.flush(backendResponse);
+  });
+
+  it('getPortfolioSnapshotTrend should map trend points', () => {
+    const portfolioId = 'p-1';
+    const backendResponse = {
+      portfolio_id: portfolioId,
+      points: [
+        {
+          snapshot_id: 's-1',
+          created_at: '2026-04-20T10:00:00.000Z',
+          total_portfolio_value: 1000,
+          total_invested: 900,
+          total_profit_loss: 100,
+          diversification: 50,
+          volatility: 40,
+        },
+      ],
+    };
+
+    service.getPortfolioSnapshotTrend(portfolioId, 10).subscribe(trend => {
+      expect(trend.portfolioId).toBe(portfolioId);
+      expect(trend.points.length).toBe(1);
+      expect(trend.points[0].snapshotId).toBe('s-1');
+      expect(trend.points[0].totalPortfolioValue).toBe(1000);
+      expect(trend.points[0].totalProfitLoss).toBe(100);
+      expect(trend.points[0].createdAt.toISOString()).toBe('2026-04-20T10:00:00.000Z');
+    });
+
+    const req = httpMock.expectOne(
+      `${environment.apiUrl}/portfolios/${portfolioId}/snapshots/trend?limit=10`
+    );
+    expect(req.request.method).toBe('GET');
+    req.flush(backendResponse);
+  });
 });
 

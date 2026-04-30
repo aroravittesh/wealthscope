@@ -1,0 +1,59 @@
+<div class="leo-assistant-root">
+  <div
+    *ngIf="isOpen"
+    class="leo-assistant-backdrop"
+    aria-hidden="true"
+    (click)="closeChat()"
+  ></div>
+
+  <div *ngIf="isOpen" class="leo-assistant-panel-layer">
+    <app-chatbot-panel (close)="closeChat()"></app-chatbot-panel>
+  </div>
+
+  <button
+    type="button"
+    class="leo-assistant-widget"
+    aria-label="Open Leo assistant chat"
+    [attr.aria-expanded]="isOpen"
+    (click)="toggleChat()"
+  >
+    <div class="leo-assistant-widget__bubble">
+      <span class="leo-assistant-widget__bubble-tail" aria-hidden="true"></span>
+      <p class="leo-assistant-widget__bubble-text">
+        Hi, how are u? I’m your personal assistant Leo.
+      </p>
+    </div>
+
+    <div class="leo-bot" aria-hidden="true">
+      <div class="leo-bot__head">
+        <div class="leo-bot__visor">
+          <span class="leo-bot__eye"></span>
+          <span class="leo-bot__eye"></span>
+        </div>
+      </div>
+      <div class="leo-bot__upper">
+        <div class="leo-bot__arm leo-bot__arm--left">
+          <span class="leo-bot__forearm"></span>
+          <span class="leo-bot__hand"></span>
+        </div>
+        <div class="leo-bot__torso">
+          <span class="leo-bot__badge">Leo</span>
+        </div>
+        <div class="leo-bot__arm leo-bot__arm--right">
+          <span class="leo-bot__forearm"></span>
+          <span class="leo-bot__hand"></span>
+        </div>
+      </div>
+      <div class="leo-bot__legs">
+        <div class="leo-bot__leg">
+          <span class="leo-bot__leg-segment"></span>
+          <span class="leo-bot__foot"></span>
+        </div>
+        <div class="leo-bot__leg">
+          <span class="leo-bot__leg-segment"></span>
+          <span class="leo-bot__foot"></span>
+        </div>
+      </div>
+    </div>
+  </button>
+</div>
