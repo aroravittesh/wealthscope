@@ -244,10 +244,57 @@ import { AdminAsset, AdminAssetPayload, AdminAuditLog, AdminService, AdminUser }
             <p class="text-slate-400 text-xs mt-1">Recent privileged actions for governance and troubleshooting.</p>
           </div>
 
-          <div *ngIf="loadingAuditLogs" class="p-4 text-slate-300 text-sm">Loading activity...</div>
-          <div *ngIf="!loadingAuditLogs && auditLogs.length === 0" class="p-4 text-slate-400 text-sm">No activity records found.</div>
+          <div class="p-4 border-b border-slate-700 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+            <input
+              type="text"
+              placeholder="Search action, target, entity..."
+              [(ngModel)]="activitySearchTerm"
+              name="activitySearchTerm"
+              class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-200"
+            />
+            <select
+              [(ngModel)]="activityUserFilter"
+              name="activityUserFilter"
+              class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-200"
+            >
+              <option value="">All users</option>
+              <option *ngFor="let actorId of uniqueActorUserIds" [value]="actorId">{{ actorId }}</option>
+            </select>
+            <select
+              [(ngModel)]="activityActionFilter"
+              name="activityActionFilter"
+              class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-200"
+            >
+              <option value="">All actions</option>
+              <option *ngFor="let action of uniqueActions" [value]="action">{{ action }}</option>
+            </select>
+            <input
+              type="date"
+              [(ngModel)]="activityStartDate"
+              name="activityStartDate"
+              class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-200"
+            />
+            <div class="flex gap-2">
+              <input
+                type="date"
+                [(ngModel)]="activityEndDate"
+                name="activityEndDate"
+                class="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-200 w-full"
+              />
+              <button
+                type="button"
+                (click)="clearActivityFilters()"
+                class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-xs font-semibold whitespace-nowrap"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
 
-          <div *ngIf="!loadingAuditLogs && auditLogs.length > 0" class="overflow-x-auto">
+          <div *ngIf="loadingAuditLogs" class="p-4 text-slate-300 text-sm">Loading activity...</div>
+          <div *ngIf="!loadingAuditLogs && filteredAuditLogs.length === 0" class="p-4 text-slate-400 text-sm">No activity records found.</div>
+
+          <div *ngIf="!loadingAuditLogs && filteredAuditLogs.length > 0" class="overflow-x-auto">
             <table class="min-w-full text-sm">
               <thead class="bg-slate-800 text-slate-300">
                 <tr>
@@ -259,7 +306,7 @@ import { AdminAsset, AdminAssetPayload, AdminAuditLog, AdminService, AdminUser }
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let log of auditLogs" class="border-t border-slate-800">
+                <tr *ngFor="let log of filteredAuditLogs" class="border-t border-slate-800">
                   <td class="p-3 text-slate-200 whitespace-nowrap">{{ log.createdAt | date:'medium' }}</td>
                   <td class="p-3 text-slate-300">{{ log.actorUserId || '-' }}</td>
                   <td class="p-3 text-slate-100 font-semibold">{{ log.action }}</td>
@@ -288,6 +335,11 @@ export class AdminDashboardComponent implements OnInit {
   updatingUserId: string | null = null;
   savingAsset = false;
   deletingAssetId: string | null = null;
+  activitySearchTerm = '';
+  activityUserFilter = '';
+  activityActionFilter = '';
+  activityStartDate = '';
+  activityEndDate = '';
 
   errorMessage: string | null = null;
   successMessage: string | null = null;
@@ -382,6 +434,64 @@ export class AdminDashboardComponent implements OnInit {
   resetAssetForm(): void {
     this.editAssetId = null;
     this.assetForm = this.emptyAssetForm();
+  }
+
+  clearActivityFilters(): void {
+    this.activitySearchTerm = '';
+    this.activityUserFilter = '';
+    this.activityActionFilter = '';
+    this.activityStartDate = '';
+    this.activityEndDate = '';
+  }
+
+  get uniqueActorUserIds(): string[] {
+    const values = this.auditLogs.map(log => log.actorUserId).filter(Boolean);
+    return Array.from(new Set(values)).sort();
+  }
+
+  get uniqueActions(): string[] {
+    const values = this.auditLogs.map(log => log.action).filter(Boolean);
+    return Array.from(new Set(values)).sort();
+  }
+
+  get filteredAuditLogs(): AdminAuditLog[] {
+    return this.auditLogs.filter(log => {
+      if (this.activityUserFilter && log.actorUserId !== this.activityUserFilter) {
+        return false;
+      }
+      if (this.activityActionFilter && log.action !== this.activityActionFilter) {
+        return false;
+      }
+
+      if (this.activityStartDate) {
+        const start = new Date(`${this.activityStartDate}T00:00:00`);
+        if (log.createdAt < start) {
+          return false;
+        }
+      }
+      if (this.activityEndDate) {
+        const end = new Date(`${this.activityEndDate}T23:59:59.999`);
+        if (log.createdAt > end) {
+          return false;
+        }
+      }
+
+      const term = this.activitySearchTerm.trim().toLowerCase();
+      if (!term) {
+        return true;
+      }
+
+      const haystack = [
+        log.action,
+        log.entityType,
+        log.entityId,
+        log.actorUserId,
+        log.beforeJson,
+        log.afterJson
+      ].join(' ').toLowerCase();
+
+      return haystack.includes(term);
+    });
   }
 
   private loadUsers(): void {

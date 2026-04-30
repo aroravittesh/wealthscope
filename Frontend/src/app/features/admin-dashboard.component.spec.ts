@@ -37,6 +37,16 @@ describe('AdminDashboardComponent', () => {
     afterJson: '{"symbol":"AAPL"}',
     createdAt: new Date(),
   };
+  const secondLog = {
+    id: 'log-2',
+    actorUserId: 'admin-2',
+    action: 'USER_ROLE_UPDATED',
+    entityType: 'user',
+    entityId: 'u1',
+    beforeJson: '{"role":"USER"}',
+    afterJson: '{"role":"ADMIN"}',
+    createdAt: new Date('2026-04-30T12:00:00.000Z'),
+  };
 
   beforeEach(async () => {
     adminServiceSpy = jasmine.createSpyObj<AdminService>('AdminService', [
@@ -55,7 +65,7 @@ describe('AdminDashboardComponent', () => {
     adminServiceSpy.createAsset.and.returnValue(of(sampleAsset));
     adminServiceSpy.updateAsset.and.returnValue(of(sampleAsset));
     adminServiceSpy.deleteAsset.and.returnValue(of({}));
-    adminServiceSpy.getAuditLogs.and.returnValue(of([sampleLog]));
+    adminServiceSpy.getAuditLogs.and.returnValue(of([sampleLog, secondLog]));
 
     await TestBed.configureTestingModule({
       imports: [AdminDashboardComponent],
@@ -74,7 +84,7 @@ describe('AdminDashboardComponent', () => {
     expect(adminServiceSpy.getAuditLogs).toHaveBeenCalled();
     expect(component.users.length).toBe(1);
     expect(component.assets.length).toBe(1);
-    expect(component.auditLogs.length).toBe(1);
+    expect(component.auditLogs.length).toBe(2);
   });
 
   it('reloadAll should clear messages and reload data', () => {
@@ -180,5 +190,39 @@ describe('AdminDashboardComponent', () => {
     expect(component.editAssetId).toBeNull();
     expect(component.assetForm.symbol).toBe('');
     expect(component.assetForm.assetType).toBe('stock');
+  });
+
+  it('filteredAuditLogs should apply actor and action filters', () => {
+    component.activityUserFilter = 'admin-2';
+    component.activityActionFilter = 'USER_ROLE_UPDATED';
+
+    expect(component.filteredAuditLogs.length).toBe(1);
+    expect(component.filteredAuditLogs[0].id).toBe('log-2');
+  });
+
+  it('filteredAuditLogs should apply search term and date range', () => {
+    component.activitySearchTerm = 'aapl';
+    component.activityStartDate = '2026-04-01';
+    component.activityEndDate = '2026-04-29';
+
+    const results = component.filteredAuditLogs;
+    expect(results.length).toBe(1);
+    expect(results[0].id).toBe('log-1');
+  });
+
+  it('clearActivityFilters should reset all activity filter fields', () => {
+    component.activitySearchTerm = 'asset';
+    component.activityUserFilter = 'admin-1';
+    component.activityActionFilter = 'ASSET_CREATED';
+    component.activityStartDate = '2026-04-01';
+    component.activityEndDate = '2026-04-30';
+
+    component.clearActivityFilters();
+
+    expect(component.activitySearchTerm).toBe('');
+    expect(component.activityUserFilter).toBe('');
+    expect(component.activityActionFilter).toBe('');
+    expect(component.activityStartDate).toBe('');
+    expect(component.activityEndDate).toBe('');
   });
 });
