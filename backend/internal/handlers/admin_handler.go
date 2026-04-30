@@ -26,6 +26,33 @@ func NewAdminHandler(
 	return &AdminHandler{UserRepo: userRepo, AssetRepo: assetRepo, AuditLogRepo: auditLogRepo}
 }
 
+func (h *AdminHandler) writeAuditLog(r *http.Request, action string, entityType string, entityID string, before any, after any) {
+	if h.AuditLogRepo == nil {
+		return
+	}
+	actorUserID, _ := r.Context().Value(middleware.UserIDKey).(string)
+	var beforeText string
+	if before != nil {
+		if b, err := json.Marshal(before); err == nil {
+			beforeText = string(b)
+		}
+	}
+	var afterText string
+	if after != nil {
+		if b, err := json.Marshal(after); err == nil {
+			afterText = string(b)
+		}
+	}
+	_ = h.AuditLogRepo.Create(&models.AuditLog{
+		ActorUserID: actorUserID,
+		Action:      action,
+		EntityType:  entityType,
+		EntityID:    entityID,
+		BeforeJSON:  beforeText,
+		AfterJSON:   afterText,
+	})
+}
+
 func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := h.UserRepo.ListAllPublic()
 	if err != nil {
@@ -70,19 +97,7 @@ func (h *AdminHandler) UpdateUserRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.AuditLogRepo != nil {
-		actorUserID, _ := r.Context().Value(middleware.UserIDKey).(string)
-		beforeJSON, _ := json.Marshal(map[string]string{"role": before.Role})
-		afterJSON, _ := json.Marshal(map[string]string{"role": role})
-		_ = h.AuditLogRepo.Create(&models.AuditLog{
-			ActorUserID: actorUserID,
-			Action:      "USER_ROLE_UPDATED",
-			EntityType:  "user",
-			EntityID:    id,
-			BeforeJSON:  string(beforeJSON),
-			AfterJSON:   string(afterJSON),
-		})
-	}
+	h.writeAuditLog(r, "USER_ROLE_UPDATED", "user", id, map[string]string{"role": before.Role}, map[string]string{"role": role})
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -127,6 +142,7 @@ func (h *AdminHandler) CreateAsset(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(created)
+	h.writeAuditLog(r, "ASSET_CREATED", "asset", created.ID, nil, created)
 }
 
 type adminUpdateAssetRequest struct {
@@ -148,6 +164,15 @@ func (h *AdminHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "symbol and asset_type (STOCK|CRYPTO|ETF) required", http.StatusBadRequest)
 		return
 	}
+	before, err := h.AssetRepo.FindByID(id)
+	if err != nil {
+		if err.Error() == "asset not found" {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	if err := h.AssetRepo.Update(id, symbol, strings.TrimSpace(req.Name), at); err != nil {
 		if err.Error() == "asset not found" {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -163,10 +188,20 @@ func (h *AdminHandler) UpdateAsset(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(a)
+	h.writeAuditLog(r, "ASSET_UPDATED", "asset", id, before, a)
 }
 
 func (h *AdminHandler) DeleteAsset(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
+	before, err := h.AssetRepo.FindByID(id)
+	if err != nil {
+		if err.Error() == "asset not found" {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	if err := h.AssetRepo.Delete(id); err != nil {
 		if err.Error() == "asset not found" {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -176,4 +211,5 @@ func (h *AdminHandler) DeleteAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+	h.writeAuditLog(r, "ASSET_DELETED", "asset", id, before, nil)
 }
