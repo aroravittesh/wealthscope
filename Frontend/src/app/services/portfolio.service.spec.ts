@@ -146,5 +146,38 @@ describe('PortfolioService', () => {
     expect(req.request.method).toBe('GET');
     req.flush(backendResponse);
   });
+
+  it('getPortfolioSnapshotTrend should map trend points', () => {
+    const portfolioId = 'p-1';
+    const backendResponse = {
+      portfolio_id: portfolioId,
+      points: [
+        {
+          snapshot_id: 's-1',
+          created_at: '2026-04-20T10:00:00.000Z',
+          total_portfolio_value: 1000,
+          total_invested: 900,
+          total_profit_loss: 100,
+          diversification: 50,
+          volatility: 40,
+        },
+      ],
+    };
+
+    service.getPortfolioSnapshotTrend(portfolioId, 10).subscribe(trend => {
+      expect(trend.portfolioId).toBe(portfolioId);
+      expect(trend.points.length).toBe(1);
+      expect(trend.points[0].snapshotId).toBe('s-1');
+      expect(trend.points[0].totalPortfolioValue).toBe(1000);
+      expect(trend.points[0].totalProfitLoss).toBe(100);
+      expect(trend.points[0].createdAt.toISOString()).toBe('2026-04-20T10:00:00.000Z');
+    });
+
+    const req = httpMock.expectOne(
+      `${environment.apiUrl}/portfolios/${portfolioId}/snapshots/trend?limit=10`
+    );
+    expect(req.request.method).toBe('GET');
+    req.flush(backendResponse);
+  });
 });
 
