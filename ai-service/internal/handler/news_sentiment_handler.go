@@ -16,9 +16,8 @@ func NewsSentimentHandler(c *gin.Context) {
 // NewsSentimentHandlerWithFetcher allows injecting a news source (tests).
 func NewsSentimentHandlerWithFetcher(fetcher newsentiment.NewsFetcher) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		raw := strings.TrimSpace(c.Param("symbol"))
-		if raw == "" {
-			RespondBadRequest(c, "Request failed", "symbol required")
+		raw, ok := RequirePathParam(c, "symbol", "symbol required")
+		if !ok {
 			return
 		}
 		symbol := strings.ToUpper(raw)

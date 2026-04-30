@@ -9,12 +9,10 @@ import (
 
 func RiskDriftHandler(c *gin.Context) {
 	var req prediction.DriftRequest
-	if err := c.BindJSON(&req); err != nil {
-		RespondBadRequest(c, "Request failed", "Invalid request")
+	if !BindJSONOrRespond(c, &req, "Invalid request") {
 		return
 	}
-	if len(req.Holdings) == 0 {
-		RespondBadRequest(c, "Request failed", "holdings required")
+	if !RequireNonEmptySlice(c, req.Holdings, "holdings required") {
 		return
 	}
 

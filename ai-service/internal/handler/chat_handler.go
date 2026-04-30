@@ -12,30 +12,26 @@ func ChatHandler(c *gin.Context) {
 		SessionID string `json:"session_id"`
 	}
 
-	if err := c.BindJSON(&body); err != nil {
-			RespondBadRequest(c, "Request failed", "Invalid request")
+	if !BindJSONOrRespond(c, &body, "Invalid request") {
 		return
 	}
-	if body.Message == "" {
-			RespondBadRequest(c, "Request failed", "Message cannot be empty")
+	message, ok := RequiredTrimmed(c, body.Message, "Message cannot be empty")
+	if !ok {
 		return
 	}
 
-	sessionID := body.SessionID
-	if sessionID == "" {
-		sessionID = "default"
-	}
+	sessionID := NormalizeSessionID(body.SessionID)
 
-	service.LogChatRequestStart(sessionID, body.Message)
+	service.LogChatRequestStart(sessionID, message)
 
-	response, err := service.ProcessMessage(sessionID, body.Message)
+	response, err := service.ProcessMessage(sessionID, message)
 	if err != nil {
-		service.LogChatRequestFailed(sessionID, body.Message, err)
+		service.LogChatRequestFailed(sessionID, message, err)
 		RespondError(c, 500, "Request failed", err.Error())
 		return
 	}
 
-	service.LogChatRequestComplete(sessionID, body.Message, response)
+	service.LogChatRequestComplete(sessionID, message, response)
 	RespondSuccess(c, 200, "Chat response generated", gin.H{
 		"response":   response,
 		"session_id": sessionID,
@@ -50,21 +46,17 @@ func ChatHandlerWithService(svc service.ChatServiceInterface) gin.HandlerFunc {
             SessionID string `json:"session_id"`
         }
 
-        if err := c.BindJSON(&body); err != nil {
-			RespondBadRequest(c, "Request failed", "Invalid request")
+		if !BindJSONOrRespond(c, &body, "Invalid request") {
             return
         }
-        if body.Message == "" {
-			RespondBadRequest(c, "Request failed", "Message cannot be empty")
+		message, ok := RequiredTrimmed(c, body.Message, "Message cannot be empty")
+		if !ok {
             return
         }
 
-        sessionID := body.SessionID
-        if sessionID == "" {
-            sessionID = "default"
-        }
+		sessionID := NormalizeSessionID(body.SessionID)
 
-        response, err := svc.ProcessMessage(sessionID, body.Message)
+		response, err := svc.ProcessMessage(sessionID, message)
         if err != nil {
 			RespondError(c, 500, "Request failed", err.Error())
             return
@@ -78,11 +70,10 @@ func ChatHandlerWithService(svc service.ChatServiceInterface) gin.HandlerFunc {
 }
 
 func ClearChatHandler(c *gin.Context) {
-    sessionID := c.Param("session_id")
-    if sessionID == "" {
-		RespondBadRequest(c, "Request failed", "session_id required")
-        return
-    }
-    openai.ClearSession(sessionID)
+	sessionID, ok := RequirePathParam(c, "session_id", "session_id required")
+	if !ok {
+		return
+	}
+	openai.ClearSession(sessionID)
 	RespondSuccess(c, 200, "Session cleared", gin.H{"session_id": sessionID})
 }

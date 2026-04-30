@@ -32,8 +32,7 @@ func CompareHandler(c *gin.Context) {
 func CompareHandlerWithFetcher(fetcher compare.Fetcher) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req compare.Request
-		if err := c.BindJSON(&req); err != nil {
-			RespondBadRequest(c, "Request failed", "Invalid JSON")
+		if !BindJSONOrRespond(c, &req, "Invalid JSON") {
 			return
 		}
 

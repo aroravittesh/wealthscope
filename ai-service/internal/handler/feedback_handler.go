@@ -24,8 +24,7 @@ func RecordFeedbackHandler(c *gin.Context) {
 func RecordFeedbackHandlerWithStore(store feedback.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var body feedback.Feedback
-		if err := c.BindJSON(&body); err != nil {
-			RespondBadRequest(c, "Request failed", "invalid JSON")
+		if !BindJSONOrRespond(c, &body, "invalid JSON") {
 			return
 		}
 		// Server controls these regardless of what the client sent.
