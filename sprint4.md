@@ -434,3 +434,134 @@ Returns aggregated sentiment with confidence and article-level highlights.
 - Live web context is used in a controlled backend-driven way for time-sensitive queries.
 - Retrieval can combine internal finance knowledge, CSV-backed Q&A, market/news provider data, and optional live web context.
 - Session handling supports follow-up continuity for better conversational experience.
+
+---
+
+# Appendix B — Sprint Documentation (Frontend)
+
+## Sprint Goal
+
+Add meaningful snapshot analytics in the frontend so users can compare historical portfolio states, see trend progression, and understand allocation drift over time.
+
+## Features Implemented
+
+### 1) Snapshot Compare (Then vs Now)
+
+- Added compare controls on analytics page to select two snapshots:
+  - Then (from snapshot)
+  - Now (to snapshot)
+- Integrated compare API response into frontend and rendered delta cards for:
+  - Total Value Change
+  - Profit/Loss Change
+  - Diversification Change
+  - Volatility Change
+- Added validation to prevent comparing the same snapshot.
+
+**Key files**
+- `Frontend/src/app/features/reporting-analytics.component.ts`
+- `Frontend/src/app/services/portfolio.service.ts`
+- `Frontend/src/app/models/index.ts`
+
+### 2) Snapshot Trend Insights
+
+- Integrated snapshot trend endpoint for chart-ready points.
+- Added mini trend chart (SVG polyline) on analytics page for total portfolio value across snapshots.
+- Added start/end date labels and point count for readability.
+
+**Key files**
+- `Frontend/src/app/features/reporting-analytics.component.ts`
+- `Frontend/src/app/services/portfolio.service.ts`
+- `Frontend/src/app/models/index.ts`
+
+### 3) Allocation Drift Insights
+
+- Added “Allocation Drift Insights” table to show top movers between snapshots.
+- Displays:
+  - Symbol
+  - Then %
+  - Now %
+  - Drift %
+  - Value Change
+- Sorted by highest absolute drift to surface biggest changes first.
+
+**Key file**
+- `Frontend/src/app/features/reporting-analytics.component.ts`
+
+## Unit Test Documentation
+
+### A) Portfolio Service Tests
+**File:** `Frontend/src/app/services/portfolio.service.spec.ts`
+
+Added/covered tests:
+- `getPortfolioSnapshotCompare should map delta payload`
+  - Verifies compare endpoint mapping:
+    - IDs, timestamps
+    - delta metrics
+    - allocation drift rows
+- `getPortfolioSnapshotTrend should map trend points`
+  - Verifies trend endpoint mapping:
+    - portfolio id
+    - snapshot points
+    - date/value metrics
+
+### B) Reporting Analytics Component Tests
+**File:** `Frontend/src/app/features/reporting-analytics.component.spec.ts`
+
+Added tests:
+- `should initialize analytics with first portfolio and load trend`
+- `runSnapshotCompare should set error when snapshot ids are invalid`
+- `runSnapshotCompare should populate compare response on success`
+- `topAllocationDriftRows should sort by largest absolute drift`
+- `trendPolylinePoints should return chart points for trend data`
+
+### C) Existing Admin Test Stabilization
+**File:** `Frontend/src/app/features/admin-dashboard.component.spec.ts`
+
+- Made one date-dependent assertion deterministic by fixing sample date in test data, to keep suite reliable.
+
+## Cypress Test Documentation
+
+### Analytics E2E Test
+**File:** `Frontend/cypress/e2e/analytics-snapshot-compare.cy.js`
+
+Test flow:
+- Visits `/analytics` with mocked authenticated user session.
+- Intercepts/mocks:
+  - portfolios list
+  - portfolio summary
+  - snapshots list
+  - trend endpoint
+  - compare endpoint
+- Clicks Compare Snapshots.
+- Verifies UI outputs:
+  - compare cards visible
+  - trend section visible
+  - allocation drift insights visible
+
+## Test Execution Commands
+
+### Unit Tests
+```bash
+cd /Users/raghhavv03/wealthscope/Frontend
+npx ng test --no-watch --browsers=ChromeHeadless
+```
+
+### Cypress Tests
+```bash
+cd /Users/raghhavv03/wealthscope/Frontend
+npm start
+```
+
+In another terminal:
+```bash
+cd /Users/raghhavv03/wealthscope/Frontend
+npm run cypress:run
+```
+
+## Outcome
+
+This sprint upgraded analytics from static snapshot viewing to actionable insight:
+- quick Then-vs-Now deltas,
+- temporal trend visibility,
+- allocation drift explainability,
+- with automated frontend coverage via unit and Cypress tests.
