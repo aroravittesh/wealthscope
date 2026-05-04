@@ -1,5 +1,6 @@
 import { AfterViewChecked, Component, ElementRef, EventEmitter, Output, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs/operators';
 import { ChatbotService } from '../../services/chatbot.service';
@@ -98,8 +99,8 @@ export class ChatbotPanelComponent implements AfterViewChecked {
           });
           this.pushMessage('bot', botReply, false, followUps);
         },
-        error: () => {
-          this.requestError = 'Unable to reach the assistant right now. Please try again.';
+        error: (error: unknown) => {
+          this.requestError = this.getRequestErrorMessage(error);
           this.pushMessage('bot', this.requestError, true);
         }
       });
@@ -190,5 +191,26 @@ export class ChatbotPanelComponent implements AfterViewChecked {
       return;
     }
     container.scrollTop = container.scrollHeight;
+  }
+
+  private getRequestErrorMessage(error: unknown): string {
+    if (error instanceof HttpErrorResponse) {
+      if (error.status === 0) {
+        return 'Assistant service is offline. Start the AI service and try again.';
+      }
+
+      const apiMessage =
+        (error.error?.error as string | undefined) ||
+        (error.error?.message as string | undefined) ||
+        (typeof error.error === 'string' ? error.error : '');
+
+      if (apiMessage.trim()) {
+        return apiMessage;
+      }
+
+      return `Assistant request failed (${error.status}). Please try again.`;
+    }
+
+    return 'Unable to reach the assistant right now. Please try again.';
   }
 }

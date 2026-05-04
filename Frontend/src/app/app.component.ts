@@ -19,17 +19,7 @@ import { ChatbotLauncherComponent } from './features/chatbot/chatbot-launcher.co
       <main class="flex-1 min-h-0 w-full" [class]="showNavbar ? ' mx-auto  ' : ''">
         <router-outlet></router-outlet>
       </main>
-
-      <footer
-        class="leo-assistant-strip shrink-0 border-t border-slate-700/50 bg-slate-950/75 backdrop-blur-md"
-        aria-label="Assistant"
-      >
-        <div
-          class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-3 sm:py-3.5 flex justify-end items-center"
-        >
-          <app-chatbot-launcher></app-chatbot-launcher>
-        </div>
-      </footer>
+      <app-chatbot-launcher></app-chatbot-launcher>
     </div>
   `,
   styles: []
