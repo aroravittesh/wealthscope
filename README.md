@@ -1,12 +1,5 @@
 # 🚀 WealthScope – Stock Portfolio Intelligence Platform
 
-## 👥 Team Members
-
-* Vittesh Arora – Backend
-* Ansh Jain – Backend
-* Raghav Gupta – Frontend
-* Rishithaa Maligireddy – Frontend
-
 ---
 
 ## 📌 Project Overview
