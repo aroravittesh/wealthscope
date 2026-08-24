@@ -1,10 +1,10 @@
-# 🚀 WealthScope – Stock Portfolio Intelligence Platform
+# 🚀 Aurex – Stock Portfolio Intelligence Platform
 
 ---
 
 ## 📌 Project Overview
 
-WealthScope is a full-stack Stock Portfolio Intelligence Platform designed to demonstrate real-world software engineering practices including system design, modular architecture, database management, machine learning integration, and cloud deployment.
+Aurex is a full-stack Stock Portfolio Intelligence Platform designed to demonstrate real-world software engineering practices including system design, modular architecture, database management, machine learning integration, and cloud deployment.
 
 The platform allows users to manage portfolios, track holdings, and analyze performance through a scalable and maintainable architecture.
 
@@ -12,7 +12,7 @@ The platform allows users to manage portfolios, track holdings, and analyze perf
 
 ## 🧠 Problem Statement
 
-Most portfolio tools lack transparency and many academic projects lack real-world architecture and deployment practices. WealthScope addresses this by building a clean, modular, and production-style system.
+Most portfolio tools lack transparency and many academic projects lack real-world architecture and deployment practices. Aurex addresses this by building a clean, modular, and production-style system.
 
 ---
 
@@ -57,8 +57,8 @@ Frontend (Angular) → Backend (Go APIs) → Database (PostgreSQL) → ML Servic
 ### Backend
 
 ```bash
-git clone https://github.com/aroravittesh/wealthscope.git
-cd wealthscope/backend
+git clone https://github.com/aroravittesh/Aurex.git
+cd Aurex/backend
 go mod tidy
 go run ./...
 ```
@@ -135,4 +135,4 @@ This project is for academic purposes only and does not provide financial advice
 
 ## ⭐ Conclusion
 
-WealthScope demonstrates a complete full-stack system with scalable architecture, integrating backend, frontend, and analytics into a single platform.
+Aurex demonstrates a complete full-stack system with scalable architecture, integrating backend, frontend, and analytics into a single platform.
