@@ -1,8 +1,8 @@
-# 🚀 Aurex – Stock Portfolio Intelligence Platform
+# Aurex – Stock Portfolio Intelligence Platform
 
 ---
 
-## 📌 Project Overview
+## Project Overview
 
 Aurex is a full-stack Stock Portfolio Intelligence Platform designed to demonstrate real-world software engineering practices including system design, modular architecture, database management, machine learning integration, and cloud deployment.
 
@@ -10,13 +10,13 @@ The platform allows users to manage portfolios, track holdings, and analyze perf
 
 ---
 
-## 🧠 Problem Statement
+## Problem Statement
 
 Most portfolio tools lack transparency and many academic projects lack real-world architecture and deployment practices. Aurex addresses this by building a clean, modular, and production-style system.
 
 ---
 
-## 🎯 Objectives
+## Objectives
 
 * Build a full-stack system using modern technologies
 * Develop REST APIs in Go with clean architecture
@@ -26,7 +26,7 @@ Most portfolio tools lack transparency and many academic projects lack real-worl
 
 ---
 
-## ⚙️ Tech Stack
+## Tech Stack
 
 * Frontend: Angular, TypeScript
 * Backend: Go (Golang), Gorilla Mux
@@ -36,13 +36,13 @@ Most portfolio tools lack transparency and many academic projects lack real-worl
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 Frontend (Angular) → Backend (Go APIs) → Database (PostgreSQL) → ML Service (Python)
 
 ---
 
-## 🔑 Features
+## Features
 
 * User authentication (JWT)
 * Portfolio management
@@ -52,7 +52,7 @@ Frontend (Angular) → Backend (Go APIs) → Database (PostgreSQL) → ML Servic
 
 ---
 
-## 🚀 Setup Instructions
+## Setup Instructions
 
 ### Backend
 
@@ -78,7 +78,7 @@ ng serve
 
 ---
 
-## 🧪 Testing
+## Testing
 
 * Backend: unit tests using Go testing
 * Frontend: tested using Cypress for login, portfolio, and holdings flows
@@ -98,13 +98,13 @@ npx cypress open
 
 ---
 
-## 📌 API Base URL
+## API Base URL
 
 http://localhost:8080/api
 
 ---
 
-## 📦 Scope
+## Scope
 
 Included:
 
@@ -118,18 +118,11 @@ Excluded:
 
 ---
 
-## ⚠️ Disclaimer
+## Disclaimer
 
 This project is for academic purposes only and does not provide financial advice.
 
----
 
-## 📌 Contributors
-
-* https://github.com/aroravittesh
-* https://github.com/leo-Ansh2004
-* https://github.com/raghhavv03
-* https://github.com/Rishithaa-88
 
 ---
 
